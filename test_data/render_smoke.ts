@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createDefaultMotionConfig, createDefaultTransitionConfig } from '@/lib/project';
 import { sanitizeOutputName } from '@/lib/render';
-import type { EditorProject } from '@/lib/types';
+import { DEFAULT_SUBTITLE_STYLE, type EditorProject } from '@/lib/types';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -41,6 +42,7 @@ const main = async () => {
     subtitles: {
       trackId: 't1',
       sourceText: 'Hello render smoke',
+      subtitleStyle: DEFAULT_SUBTITLE_STYLE,
       cues: [
         {
           id: 'cue-1',
@@ -53,6 +55,11 @@ const main = async () => {
     },
     background: {
       trackId: 'v1',
+      globalTransition: createDefaultTransitionConfig(),
+      globalMotion: {
+        ...createDefaultMotionConfig(),
+        strength: 0.6,
+      },
       segments: [
         {
           id: 'bg-1',
@@ -62,14 +69,8 @@ const main = async () => {
           start: 0,
           duration: 4,
           visualType: 'gradient',
-          transition: {
-            kind: 'fade',
-            duration: 0.4,
-          },
-          motion: {
-            mode: 'beat-pulse',
-            strength: 0.6,
-          },
+          transition: { kind: 'none', duration: 0, ease: 'easeInOut' },
+          motion: createDefaultMotionConfig(),
         },
       ],
     },

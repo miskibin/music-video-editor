@@ -2,17 +2,23 @@ import { z } from 'zod';
 import {
   AlignmentLanguage,
   AssetRecord,
+  BackgroundLayer,
   BackgroundSegment,
   Clip,
   EditorProject,
   LyricSyncState,
+  MotionConfig,
   MusicClip,
   SubtitleAlignmentInput,
   SubtitleAlignmentResult,
   SubtitleAlignmentState,
   SubtitleCue,
+  DEFAULT_SUBTITLE_STYLE,
+  SubtitleStyle,
   Track,
+  TransitionConfig,
 } from '@/lib/types';
+import { colorForBackgroundSegment } from '@/lib/visual-clip-colors';
 
 export const PROJECT_VERSION = 3 as const;
 export const ACTIVE_PROJECT_ID = 'active-project';
@@ -30,13 +36,50 @@ export const TIMELINE_TRACKS: Track[] = [
 const assetKindSchema = z.enum(['audio', 'image', 'video']);
 const assetSourceSchema = z.enum(['upload', 'sample', 'ai-generated', 'ai-selected']);
 const visualTypeSchema = z.enum(['gradient', 'image', 'video']);
+
+const transitionKindSchema = z.enum([
+  'none',
+  'fade',
+  'slide',
+  'crossfade',
+  'slide-left',
+  'slide-right',
+  'zoom',
+  'flash',
+]);
+const transitionEaseSchema = z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut']);
 const transitionSchema = z.object({
-  kind: z.enum(['none', 'fade', 'slide']),
+  kind: transitionKindSchema,
   duration: z.number().min(0),
+  ease: transitionEaseSchema.optional().default('easeInOut'),
 });
+
 const motionSchema = z.object({
   mode: z.enum(['none', 'beat-pulse', 'kick-zoom']),
   strength: z.number().min(0),
+  sensitivity: z.number().min(0).max(1).default(0.65),
+  smoothness: z.number().min(0).max(1).default(0.5),
+  frequencyMultiplier: z.number().min(0.25).max(4).default(1),
+  decay: z.number().min(0).max(1).default(0.55),
+});
+
+const subtitleStyleSchema = z.object({
+  preset: z.enum(['glass', 'tiktok-bold', 'minimal', 'outline']),
+  fontSize: z.number().min(12).max(120),
+  textColor: z.string(),
+  backgroundOpacity: z.number().min(0).max(1),
+  backgroundColor: z.string(),
+  textOpacity: z.number().min(0).max(1),
+  fontWeight: z.number().min(100).max(900),
+  letterSpacing: z.number().min(-0.2).max(0.5),
+  bottomOffsetPx: z.number().min(0).max(600),
+  horizontalOffsetPx: z.number().min(-800).max(800).default(0),
+  horizontalPaddingPx: z.number().min(0).max(200),
+  maxWidthPercent: z.number().min(40).max(100),
+  borderRadiusPx: z.number().min(0).max(80),
+  backdropBlurPx: z.number().min(0).max(40),
+  textTransform: z.enum(['none', 'uppercase', 'lowercase']),
+  wordHighlightMode: z.enum(['none', 'karaoke']),
 });
 
 const assetRecordSchema = z.object({
@@ -64,6 +107,8 @@ const musicClipSchema = z.object({
   trimStart: z.number().min(0).optional(),
   waveform: z.array(z.number()).optional(),
   bpm: z.number().min(40).max(240).nullable().optional(),
+  fadeInDuration: z.number().min(0).max(60).optional(),
+  fadeOutDuration: z.number().min(0).max(60).optional(),
 });
 
 const subtitleWordSchema = z.object({
@@ -113,6 +158,7 @@ const subtitleLayerSchema = z.object({
   trackId: z.literal(SUBTITLE_TRACK_ID),
   sourceText: z.string(),
   cues: z.array(subtitleCueSchema),
+  subtitleStyle: subtitleStyleSchema.default(() => ({ ...DEFAULT_SUBTITLE_STYLE })),
 });
 
 const backgroundSegmentSchema = z.object({
@@ -127,6 +173,13 @@ const backgroundSegmentSchema = z.object({
   visualType: visualTypeSchema,
   transition: transitionSchema,
   motion: motionSchema,
+});
+
+const backgroundLayerSchema = z.object({
+  trackId: z.literal(BACKGROUND_TRACK_ID),
+  segments: z.array(backgroundSegmentSchema),
+  globalTransition: transitionSchema.optional(),
+  globalMotion: motionSchema.optional(),
 });
 
 const editorProjectSchema = z.object({
@@ -145,10 +198,7 @@ const editorProjectSchema = z.object({
     clip: musicClipSchema.nullable(),
   }),
   subtitles: subtitleLayerSchema,
-  background: z.object({
-    trackId: z.literal(BACKGROUND_TRACK_ID),
-    segments: z.array(backgroundSegmentSchema),
-  }),
+  background: backgroundLayerSchema,
   assets: z.record(z.string(), assetRecordSchema),
   mediaLibraryAssetIds: z.array(z.string()).default([]),
   lyricSync: lyricSyncStateSchema,
@@ -195,10 +245,7 @@ const legacyEditorProjectSchema = z.object({
     clip: musicClipSchema.nullable(),
   }),
   subtitles: subtitleLayerSchema,
-  background: z.object({
-    trackId: z.literal(BACKGROUND_TRACK_ID),
-    segments: z.array(backgroundSegmentSchema),
-  }),
+  background: backgroundLayerSchema,
   assets: z.record(z.string(), assetRecordSchema),
 });
 
@@ -257,31 +304,122 @@ const migrateLegacyProject = (legacyProject: z.infer<typeof legacyEditorProjectS
   version: PROJECT_VERSION,
   lyricSync: createDefaultLyricSyncState(legacyProject),
   mediaLibraryAssetIds: [],
-});
+}) as EditorProject;
 
 const migrateLegacyPhase3Project = (legacyProject: z.infer<typeof legacyPhase3ProjectSchema>): EditorProject => {
   const { phase3, ...project } = legacyProject;
 
   return {
     ...project,
+    subtitles: {
+      ...project.subtitles,
+      subtitleStyle: project.subtitles.subtitleStyle ?? createDefaultSubtitleStyle(),
+    },
     lyricSync: phase3,
     mediaLibraryAssetIds: legacyProject.mediaLibraryAssetIds ?? [],
-  };
+  } as EditorProject;
 };
 
 export const createId = () => Math.random().toString(36).substring(2, 9);
 
-export const createDefaultBackgroundSegment = (): BackgroundSegment => ({
-  id: createId(),
-  assetId: null,
-  name: 'Background',
-  color: '#2563eb',
-  start: 0,
-  duration: 12,
-  visualType: 'gradient',
-  transition: { kind: 'none', duration: 0 },
-  motion: { mode: 'beat-pulse', strength: 0.2 },
+export const createDefaultSubtitleStyle = (): SubtitleStyle => ({ ...DEFAULT_SUBTITLE_STYLE });
+
+export const createDefaultTransitionConfig = (): TransitionConfig => ({
+  kind: 'none',
+  duration: 0,
+  ease: 'easeInOut',
 });
+
+export const createDefaultMotionConfig = (): MotionConfig => ({
+  mode: 'beat-pulse',
+  strength: 0.2,
+  sensitivity: 0.65,
+  smoothness: 0.5,
+  frequencyMultiplier: 1,
+  decay: 0.55,
+});
+
+const normalizeTransitionConfig = (transition: TransitionConfig): TransitionConfig => {
+  const defaults = createDefaultTransitionConfig();
+  return {
+    ...defaults,
+    ...transition,
+    ease: transition.ease ?? defaults.ease,
+  };
+};
+
+const normalizeMotionConfig = (motion: MotionConfig): MotionConfig => {
+  const defaults = createDefaultMotionConfig();
+  return {
+    ...defaults,
+    ...motion,
+    sensitivity: motion.sensitivity ?? defaults.sensitivity,
+    smoothness: motion.smoothness ?? defaults.smoothness,
+    frequencyMultiplier: motion.frequencyMultiplier ?? defaults.frequencyMultiplier,
+    decay: motion.decay ?? defaults.decay,
+  };
+};
+
+const normalizeMusicClip = (clip: MusicClip): MusicClip => ({
+  ...clip,
+  fadeInDuration: clip.fadeInDuration ?? 0,
+  fadeOutDuration: clip.fadeOutDuration ?? 0,
+});
+
+/** Ensures new fields exist on loaded/migrated projects (idempotent). */
+export const normalizeEditorProject = (project: EditorProject): EditorProject => {
+  const bg = project.background as BackgroundLayer & {
+    globalTransition?: TransitionConfig;
+    globalMotion?: MotionConfig;
+  };
+  const firstSeg = bg.segments[0];
+  const globalTransition = bg.globalTransition
+    ? normalizeTransitionConfig(bg.globalTransition)
+    : normalizeTransitionConfig(firstSeg?.transition ?? createDefaultTransitionConfig());
+  const globalMotion = bg.globalMotion
+    ? normalizeMotionConfig(bg.globalMotion)
+    : normalizeMotionConfig(firstSeg?.motion ?? createDefaultMotionConfig());
+
+  return {
+    ...project,
+    subtitles: {
+      ...project.subtitles,
+      subtitleStyle: {
+        ...DEFAULT_SUBTITLE_STYLE,
+        ...(project.subtitles.subtitleStyle ?? {}),
+      },
+    },
+    background: {
+      ...bg,
+      globalTransition,
+      globalMotion,
+      segments: bg.segments.map((segment) => ({
+        ...segment,
+        transition: normalizeTransitionConfig(segment.transition),
+        motion: normalizeMotionConfig(segment.motion),
+      })),
+    },
+    music: {
+      ...project.music,
+      clip: project.music.clip ? normalizeMusicClip(project.music.clip) : null,
+    },
+  };
+};
+
+export const createDefaultBackgroundSegment = (): BackgroundSegment => {
+  const id = createId();
+  return {
+    id,
+    assetId: null,
+    name: 'Background',
+    color: colorForBackgroundSegment(id),
+    start: 0,
+    duration: 12,
+    visualType: 'gradient',
+    transition: createDefaultTransitionConfig(),
+    motion: createDefaultMotionConfig(),
+  };
+};
 
 export const createDefaultSubtitleCue = (): SubtitleCue => ({
   id: createId(),
@@ -313,10 +451,13 @@ export const createDefaultProject = (): EditorProject => {
       trackId: SUBTITLE_TRACK_ID,
       sourceText: 'Your subtitles here',
       cues: [createDefaultSubtitleCue()],
+      subtitleStyle: createDefaultSubtitleStyle(),
     },
     background: {
       trackId: BACKGROUND_TRACK_ID,
       segments: [createDefaultBackgroundSegment()],
+      globalTransition: createDefaultTransitionConfig(),
+      globalMotion: createDefaultMotionConfig(),
     },
     assets: {},
     mediaLibraryAssetIds: [],
@@ -492,18 +633,18 @@ export const parseProjectDocument = (candidate: unknown): EditorProject => {
   if (!parsed.success) {
     const legacyPhase3Parsed = legacyPhase3ProjectSchema.safeParse(candidate);
     if (legacyPhase3Parsed.success) {
-      return pruneUnusedAssets(migrateLegacyPhase3Project(legacyPhase3Parsed.data));
+      return normalizeEditorProject(pruneUnusedAssets(migrateLegacyPhase3Project(legacyPhase3Parsed.data)));
     }
 
     const legacyParsed = legacyEditorProjectSchema.safeParse(candidate);
     if (legacyParsed.success) {
-      return pruneUnusedAssets(migrateLegacyProject(legacyParsed.data));
+      return normalizeEditorProject(pruneUnusedAssets(migrateLegacyProject(legacyParsed.data)));
     }
 
     return createDefaultProject();
   }
 
-  return pruneUnusedAssets(parsed.data);
+  return normalizeEditorProject(pruneUnusedAssets(parsed.data as EditorProject));
 };
 
 export const sanitizeProjectAgainstMissingAssets = (
@@ -550,6 +691,8 @@ export const buildTimelineClips = (
       assetId: project.music.clip.assetId ?? undefined,
       assetKind: asset?.kind,
       assetUrl: project.music.clip.assetId ? assetUrls[project.music.clip.assetId] : undefined,
+      fadeInDuration: project.music.clip.fadeInDuration,
+      fadeOutDuration: project.music.clip.fadeOutDuration,
     });
   }
 
@@ -618,6 +761,45 @@ export const appendSubtitleCue = (
     },
   });
 };
+
+export const updateSubtitleStyle = (
+  project: EditorProject,
+  updates: Partial<SubtitleStyle>,
+): EditorProject => markProjectUpdated({
+  ...project,
+  subtitles: {
+    ...project.subtitles,
+    subtitleStyle: {
+      ...project.subtitles.subtitleStyle,
+      ...updates,
+    },
+  },
+});
+
+export const updateGlobalBackgroundEffects = (
+  project: EditorProject,
+  updates: {
+    transition?: Partial<TransitionConfig>;
+    motion?: Partial<MotionConfig>;
+  },
+): EditorProject => markProjectUpdated({
+  ...project,
+  background: {
+    ...project.background,
+    globalTransition: updates.transition
+      ? normalizeTransitionConfig({
+        ...project.background.globalTransition,
+        ...updates.transition,
+      })
+      : project.background.globalTransition,
+    globalMotion: updates.motion
+      ? normalizeMotionConfig({
+        ...project.background.globalMotion,
+        ...updates.motion,
+      })
+      : project.background.globalMotion,
+  },
+});
 
 export const updateSubtitleAlignmentInput = (
   project: EditorProject,
@@ -789,6 +971,11 @@ export const updateTimelineClipInProject = (
       updates.sourceDuration ?? clip.sourceDuration,
       updates.trimStart ?? clip.trimStart,
     );
+    const nextFadeIn = updates.fadeInDuration ?? clip.fadeInDuration ?? 0;
+    const nextFadeOut = updates.fadeOutDuration ?? clip.fadeOutDuration ?? 0;
+    const maxFade = Math.max(0, normalized.duration - 0.05);
+    const fadeInDuration = clamp(nextFadeIn, 0, maxFade);
+    const fadeOutDuration = clamp(nextFadeOut, 0, Math.max(0, maxFade - fadeInDuration));
 
     return markProjectUpdated({
       ...project,
@@ -802,6 +989,8 @@ export const updateTimelineClipInProject = (
           sourceDuration: normalized.sourceDuration,
           trimStart: normalized.trimStart,
           waveform: updates.waveform ?? clip.waveform,
+          fadeInDuration,
+          fadeOutDuration,
         },
       },
     });

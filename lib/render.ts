@@ -1,9 +1,11 @@
 import {
   BackgroundSegment,
+  DEFAULT_SUBTITLE_STYLE,
   EditorProject,
   MotionConfig,
   MusicClip,
   SubtitleCue,
+  SubtitleStyle,
   SubtitleWord,
   TransitionConfig,
 } from '@/lib/types';
@@ -18,6 +20,8 @@ export type RenderAudioTrack = {
   trimBefore: number;
   trimAfter: number;
   bpm: number | null;
+  fadeInFrames: number;
+  fadeOutFrames: number;
 };
 
 type CreateRenderManifestOptions = {
@@ -60,6 +64,7 @@ export type RenderManifest = {
   fps: number;
   durationInFrames: number;
   music: RenderAudioTrack | null;
+  subtitleStyle: SubtitleStyle;
   subtitleCues: RenderSubtitleCue[];
   backgroundSegments: RenderBackgroundSegment[];
 };
@@ -166,6 +171,8 @@ const toRenderBackgroundSegment = (
   segment: BackgroundSegment,
   src: string | null,
   fps: number,
+  globalTransition: TransitionConfig,
+  globalMotion: MotionConfig,
 ): RenderBackgroundSegment => ({
   id: segment.id,
   name: segment.name,
@@ -175,8 +182,8 @@ const toRenderBackgroundSegment = (
   startFrame: maybeSecondsToFrames(segment.start, fps),
   durationInFrames: secondsToFrames(segment.duration, fps),
   trimBefore: maybeSecondsToFrames(segment.trimStart ?? 0, fps),
-  transition: segment.transition,
-  motion: segment.motion,
+  transition: globalTransition,
+  motion: globalMotion,
 });
 
 export const createPlaceholderRenderManifest = (): RenderManifest => ({
@@ -186,6 +193,7 @@ export const createPlaceholderRenderManifest = (): RenderManifest => ({
   fps: RENDER_FPS,
   durationInFrames: 360,
   music: null,
+  subtitleStyle: { ...DEFAULT_SUBTITLE_STYLE },
   subtitleCues: [],
   backgroundSegments: [],
 });
@@ -220,10 +228,18 @@ export const createRenderManifest = (
         throw new Error(`Missing staged background asset for "${segment.name}".`);
       }
 
-      return toRenderBackgroundSegment(segment, src, fps);
+      return toRenderBackgroundSegment(
+        segment,
+        src,
+        fps,
+        project.background.globalTransition,
+        project.background.globalMotion,
+      );
     })
     .sort((left, right) => left.startFrame - right.startFrame);
 
+  const fadeInSec = music?.fadeInDuration ?? 0;
+  const fadeOutSec = music?.fadeOutDuration ?? 0;
   const musicTrack = music && musicSrc ? {
     src: musicSrc,
     durationInFrames: secondsToFrames(music.duration, fps),
@@ -232,6 +248,8 @@ export const createRenderManifest = (
       ? secondsToFrames(music.duration, fps)
       : maybeSecondsToFrames((music.trimStart ?? 0) + music.duration, fps),
     bpm: music.bpm ?? null,
+    fadeInFrames: maybeSecondsToFrames(fadeInSec, fps),
+    fadeOutFrames: maybeSecondsToFrames(fadeOutSec, fps),
   } satisfies RenderAudioTrack : null;
 
   const durationInFrames = Math.max(
@@ -241,6 +259,11 @@ export const createRenderManifest = (
     createPlaceholderRenderManifest().durationInFrames,
   );
 
+  const subtitleStyle: SubtitleStyle = {
+    ...DEFAULT_SUBTITLE_STYLE,
+    ...(project.subtitles.subtitleStyle ?? {}),
+  };
+
   return {
     compositionId: RENDER_COMPOSITION_ID,
     width: project.format.width,
@@ -248,6 +271,7 @@ export const createRenderManifest = (
     fps,
     durationInFrames,
     music: musicTrack,
+    subtitleStyle,
     subtitleCues,
     backgroundSegments,
   };

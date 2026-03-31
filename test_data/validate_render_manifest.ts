@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { createDefaultMotionConfig, createDefaultTransitionConfig } from '@/lib/project';
 import { createRenderManifest, RENDER_FPS } from '@/lib/render';
-import type { EditorProject } from '@/lib/types';
+import { DEFAULT_SUBTITLE_STYLE, type EditorProject } from '@/lib/types';
 
 const now = new Date().toISOString();
 
@@ -33,6 +34,7 @@ const project: EditorProject = {
   subtitles: {
     trackId: 't1',
     sourceText: 'hello from trim-aware subtitles',
+    subtitleStyle: DEFAULT_SUBTITLE_STYLE,
     cues: [
       {
         id: 'cue-1',
@@ -67,6 +69,15 @@ const project: EditorProject = {
   },
   background: {
     trackId: 'v1',
+    globalTransition: {
+      ...createDefaultTransitionConfig(),
+      kind: 'fade',
+      duration: 0.3,
+    },
+    globalMotion: {
+      ...createDefaultMotionConfig(),
+      strength: 0.4,
+    },
     segments: [
       {
         id: 'bg-1',
@@ -76,14 +87,8 @@ const project: EditorProject = {
         start: 0,
         duration: 4,
         visualType: 'gradient',
-        transition: {
-          kind: 'fade',
-          duration: 0.3,
-        },
-        motion: {
-          mode: 'beat-pulse',
-          strength: 0.4,
-        },
+        transition: { kind: 'none', duration: 0, ease: 'easeInOut' },
+        motion: createDefaultMotionConfig(),
       },
       {
         id: 'bg-2',
@@ -95,14 +100,8 @@ const project: EditorProject = {
         sourceDuration: 9,
         trimStart: 1,
         visualType: 'video',
-        transition: {
-          kind: 'slide',
-          duration: 0.5,
-        },
-        motion: {
-          mode: 'kick-zoom',
-          strength: 0.6,
-        },
+        transition: { kind: 'none', duration: 0, ease: 'easeInOut' },
+        motion: createDefaultMotionConfig(),
       },
     ],
   },
@@ -162,5 +161,8 @@ assert.equal(manifest.subtitleCues[1].startFrame, 15);
 assert.equal(manifest.subtitleCues[1].durationInFrames, 90);
 assert.equal(manifest.subtitleCues[1].words.length, 2);
 assert.equal(manifest.durationInFrames, 360);
+assert.deepEqual(manifest.subtitleStyle.preset, DEFAULT_SUBTITLE_STYLE.preset);
+assert.equal(manifest.music?.fadeInFrames, 0);
+assert.equal(manifest.music?.fadeOutFrames, 0);
 
 console.log('render manifest validation passed');

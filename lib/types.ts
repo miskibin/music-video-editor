@@ -10,6 +10,92 @@ export type AlignmentLanguage = 'en' | 'pl';
 
 export type SubtitleAlignmentStatus = 'idle' | 'running' | 'review' | 'applied' | 'error';
 
+/** Visual preset id for subtitle appearance (sidebar + Remotion). */
+export type SubtitleStylePreset = 'glass' | 'tiktok-bold' | 'minimal' | 'outline';
+
+export type SubtitleTextTransform = 'none' | 'uppercase' | 'lowercase';
+
+/** Highlight active word when word timings exist. */
+export type SubtitleWordHighlightMode = 'none' | 'karaoke';
+
+export interface SubtitleStyle {
+  preset: SubtitleStylePreset;
+  fontSize: number;
+  textColor: string;
+  /** 0–1 opacity of caption card background */
+  backgroundOpacity: number;
+  backgroundColor: string;
+  /** 0–1 opacity of text fill */
+  textOpacity: number;
+  fontWeight: number;
+  /** em-ish tracking; applied as letterSpacing in px via fontSize scale */
+  letterSpacing: number;
+  bottomOffsetPx: number;
+  /** Horizontal shift from center in composition pixels (e.g. 1080-wide frame). */
+  horizontalOffsetPx: number;
+  horizontalPaddingPx: number;
+  maxWidthPercent: number;
+  borderRadiusPx: number;
+  backdropBlurPx: number;
+  textTransform: SubtitleTextTransform;
+  wordHighlightMode: SubtitleWordHighlightMode;
+}
+
+/** Default “glass card” look (matches original hardcoded Remotion subtitle). */
+export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
+  preset: 'glass',
+  fontSize: 46,
+  textColor: '#ffffff',
+  backgroundOpacity: 0.58,
+  backgroundColor: '#000000',
+  textOpacity: 1,
+  fontWeight: 700,
+  letterSpacing: -0.03,
+  bottomOffsetPx: 120,
+  horizontalOffsetPx: 0,
+  horizontalPaddingPx: 64,
+  maxWidthPercent: 82,
+  borderRadiusPx: 28,
+  backdropBlurPx: 18,
+  textTransform: 'none',
+  wordHighlightMode: 'none',
+};
+
+export type TransitionKind =
+  | 'none'
+  | 'fade'
+  | 'slide'
+  | 'crossfade'
+  | 'slide-left'
+  | 'slide-right'
+  | 'zoom'
+  | 'flash';
+
+export type TransitionEase = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+
+export interface TransitionConfig {
+  kind: TransitionKind;
+  /** Seconds (in/out segment animation length). */
+  duration: number;
+  ease?: TransitionEase;
+}
+
+export type MotionMode = 'none' | 'beat-pulse' | 'kick-zoom';
+
+export interface MotionConfig {
+  mode: MotionMode;
+  /** Base intensity 0–1 */
+  strength: number;
+  /** How responsive to beat phase (0 = dull, 1 = snappy) */
+  sensitivity: number;
+  /** Smoothing / inertia 0–1 */
+  smoothness: number;
+  /** Multiplier on beat frequency (1 = normal) */
+  frequencyMultiplier: number;
+  /** Decay for kick envelope 0–1 */
+  decay: number;
+}
+
 export interface AssetRecord {
   id: string;
   kind: AssetKind;
@@ -36,6 +122,10 @@ export interface MusicClip {
   waveform?: number[];
   /** Estimated from audio when uploaded; used for beat grid and motion preview. */
   bpm?: number | null;
+  /** Seconds of fade-in at the start of the trimmed region */
+  fadeInDuration?: number;
+  /** Seconds of fade-out at the end of the trimmed region */
+  fadeOutDuration?: number;
 }
 
 export interface SubtitleWord {
@@ -85,16 +175,7 @@ export interface SubtitleLayer {
   trackId: 't1';
   sourceText: string;
   cues: SubtitleCue[];
-}
-
-export interface TransitionConfig {
-  kind: 'none' | 'fade' | 'slide';
-  duration: number;
-}
-
-export interface MotionConfig {
-  mode: 'none' | 'beat-pulse' | 'kick-zoom';
-  strength: number;
+  subtitleStyle: SubtitleStyle;
 }
 
 export interface BackgroundSegment {
@@ -119,6 +200,9 @@ export interface MusicLayer {
 export interface BackgroundLayer {
   trackId: 'v1';
   segments: BackgroundSegment[];
+  /** Applied to every background segment in preview and export. */
+  globalTransition: TransitionConfig;
+  globalMotion: MotionConfig;
 }
 
 export interface ProjectFormat {
@@ -138,9 +222,8 @@ export interface EditorProject {
   subtitles: SubtitleLayer;
   background: BackgroundLayer;
   assets: Record<string, AssetRecord>;
-  /** Asset IDs kept for the media gallery (library-only or also on timeline). */
-  mediaLibraryAssetIds: string[];
   lyricSync: LyricSyncState;
+  mediaLibraryAssetIds: string[];
 }
 
 export interface Clip {
@@ -159,6 +242,9 @@ export interface Clip {
   overlayText?: string;
   waveform?: number[];
   bpm?: number | null;
+  /** Music clip only */
+  fadeInDuration?: number;
+  fadeOutDuration?: number;
 }
 
 export interface Track {

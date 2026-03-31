@@ -8,7 +8,17 @@ import MediaGalleryPanel from '@/components/MediaGalleryPanel';
 import Timeline from '@/components/Timeline';
 import PropertiesPanel from '@/components/PropertiesPanel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { AssetRecord, BackgroundSegment, Clip, MusicClip, SubtitleAlignmentInput, SubtitleCue } from '@/lib/types';
+import {
+  AssetRecord,
+  BackgroundSegment,
+  Clip,
+  MusicClip,
+  SubtitleAlignmentInput,
+  SubtitleCue,
+  type MotionConfig,
+  type SubtitleStyle,
+  type TransitionConfig,
+} from '@/lib/types';
 import {
   ACTIVE_PROJECT_ID,
   MIN_CLIP_DURATION,
@@ -34,9 +44,14 @@ import {
   startSubtitleAlignment,
   storeSubtitleAlignmentError,
   storeSubtitleAlignmentResult,
+  updateGlobalBackgroundEffects,
+  updateSubtitleStyle,
   updateTimelineClipInProject,
   upsertBackgroundSegment,
+  createDefaultMotionConfig,
+  createDefaultTransitionConfig,
 } from '@/lib/project';
+import { colorForBackgroundSegment } from '@/lib/visual-clip-colors';
 import {
   deletePersistedAssets,
   loadPersistedAssetBlobs,
@@ -217,6 +232,10 @@ export default function Editor() {
   );
   const subtitleSnapTimes = useMemo(
     () => project.subtitles.cues.map((cue) => cue.start),
+    [project.subtitles.cues],
+  );
+  const subtitleKaraokeAvailable = useMemo(
+    () => project.subtitles.cues.some((cue) => cue.words.length > 0),
     [project.subtitles.cues],
   );
   const subtitleAlignmentInput = useMemo<SubtitleAlignmentInput>(() => {
@@ -624,7 +643,7 @@ export default function Editor() {
         id: segmentId,
         assetId,
         name: file.name,
-        color: isVideo ? '#38bdf8' : '#fb7185',
+        color: colorForBackgroundSegment(segmentId),
         start: hasSinglePlaceholder ? 0 : getTrackMaxEnd(currentProject.background.segments),
         duration: isVideo
           ? safeSourceDuration ?? 12
@@ -632,8 +651,8 @@ export default function Editor() {
         sourceDuration: safeSourceDuration,
         trimStart: isVideo ? 0 : undefined,
         visualType: isVideo ? 'video' : 'image',
-        transition: { kind: 'none', duration: 0 },
-        motion: { mode: 'beat-pulse', strength: 0.2 },
+        transition: createDefaultTransitionConfig(),
+        motion: { ...createDefaultMotionConfig(), strength: 0.2 },
       };
       const asset = createUploadedAssetRecord(assetId, file, {
         kind: isVideo ? 'video' : 'image',
@@ -809,7 +828,7 @@ export default function Editor() {
         id: segmentId,
         assetId,
         name: asset.name,
-        color: isVideo ? '#38bdf8' : '#fb7185',
+        color: colorForBackgroundSegment(segmentId),
         start: safeStart,
         duration: isVideo
           ? safeSourceDuration ?? 12
@@ -817,8 +836,8 @@ export default function Editor() {
         sourceDuration: safeSourceDuration,
         trimStart: isVideo ? 0 : undefined,
         visualType: isVideo ? 'video' : 'image',
-        transition: { kind: 'none', duration: 0 },
-        motion: { mode: 'beat-pulse', strength: 0.2 },
+        transition: createDefaultTransitionConfig(),
+        motion: { ...createDefaultMotionConfig(), strength: 0.2 },
       };
 
       setProject((nextProject) => upsertBackgroundSegment(nextProject, segment, asset, { replacePlaceholder: hasSinglePlaceholder }));
@@ -828,6 +847,17 @@ export default function Editor() {
 
   const handleUpdateClip = useCallback((id: string, updates: Partial<Clip>) => {
     setProject((currentProject) => updateTimelineClipInProject(currentProject, id, updates));
+  }, []);
+
+  const handleSubtitleStyleChange = useCallback((updates: Partial<SubtitleStyle>) => {
+    setProject((currentProject) => updateSubtitleStyle(currentProject, updates));
+  }, []);
+
+  const handleGlobalBackgroundChange = useCallback((updates: {
+    transition?: Partial<TransitionConfig>;
+    motion?: Partial<MotionConfig>;
+  }) => {
+    setProject((currentProject) => updateGlobalBackgroundEffects(currentProject, updates));
   }, []);
 
   const handleDragEnd = useCallback((clipId: string) => {
@@ -1171,10 +1201,22 @@ export default function Editor() {
                     <VideoPreview
                       currentTime={currentTime}
                       manifest={renderPreviewManifest}
+                      subtitleStyle={project.subtitles.subtitleStyle}
+                      onSubtitleStyleChange={handleSubtitleStyleChange}
                     />
                   </div>
                 </div>
-                <PropertiesPanel clip={selectedClip} onChange={handleUpdateClip} />
+                <PropertiesPanel
+                  clip={selectedClip}
+                  onChange={handleUpdateClip}
+                  subtitleStyle={project.subtitles.subtitleStyle}
+                  onSubtitleStyleChange={handleSubtitleStyleChange}
+                  subtitleKaraokeAvailable={subtitleKaraokeAvailable}
+                  globalTransition={project.background.globalTransition}
+                  globalMotion={project.background.globalMotion}
+                  onGlobalBackgroundChange={handleGlobalBackgroundChange}
+                  musicClip={musicClip}
+                />
               </div>
             </ResizablePanel>
             <ResizableHandle
