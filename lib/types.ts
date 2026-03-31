@@ -9,6 +9,8 @@ export interface Clip {
   color: string;
   start: number; // in seconds
   duration: number; // in seconds
+  sourceDuration?: number;
+  trimStart?: number;
   assetUrl?: string;
   visualType?: VisualType;
   overlayText?: string;

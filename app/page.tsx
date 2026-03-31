@@ -10,7 +10,8 @@ import { Clip, Track, TrackType } from '@/lib/types';
 const AUDIO_TRACK_ID = 'a1';
 const VIDEO_TRACK_ID = 'v1';
 const TEXT_TRACK_ID = 't1';
-const WAVEFORM_BARS = 72;
+const WAVEFORM_BARS = 320;
+const MIN_CLIP_DURATION = 1;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -105,7 +106,61 @@ const waitForAudioMetadata = (audio: HTMLAudioElement) => new Promise<void>((res
   audio.addEventListener('error', handleError, { once: true });
 });
 
+const waitForAudioReady = (audio: HTMLAudioElement) => new Promise<void>((resolve) => {
+  if (audio.readyState >= 2) {
+    resolve();
+    return;
+  }
+
+  const handleLoadedData = () => {
+    resolve();
+  };
+
+  const handleCanPlay = () => {
+    resolve();
+  };
+
+  const handleError = () => {
+    resolve();
+  };
+
+  audio.addEventListener('loadeddata', handleLoadedData, { once: true });
+  audio.addEventListener('canplay', handleCanPlay, { once: true });
+  audio.addEventListener('error', handleError, { once: true });
+});
+
 const sortClipsByStart = (clips: Clip[]) => [...clips].sort((left, right) => left.start - right.start);
+
+const getClipSourceDuration = (clip: Clip) => clip.sourceDuration ?? clip.duration;
+
+const getClipTrimStart = (clip: Clip) => clip.trimStart ?? 0;
+
+const getClipTrimEnd = (clip: Clip) => Math.min(getClipTrimStart(clip) + clip.duration, getClipSourceDuration(clip));
+
+const normalizeClipUpdates = (clip: Clip, updates: Partial<Clip>) => {
+  if (clip.trackId !== AUDIO_TRACK_ID || !clip.assetUrl) {
+    return updates;
+  }
+
+  const sourceDuration = Math.max(getClipSourceDuration(clip), MIN_CLIP_DURATION);
+  const trimStart = clamp(
+    updates.trimStart ?? getClipTrimStart(clip),
+    0,
+    Math.max(sourceDuration - MIN_CLIP_DURATION, 0),
+  );
+  const duration = clamp(
+    updates.duration ?? clip.duration,
+    MIN_CLIP_DURATION,
+    Math.max(sourceDuration - trimStart, MIN_CLIP_DURATION),
+  );
+
+  return {
+    ...updates,
+    sourceDuration,
+    trimStart,
+    duration,
+  };
+};
 
 const findClipAtTime = (clips: Clip[], time: number) => clips.find(
   (clip) => time >= clip.start && time < clip.start + clip.duration,
@@ -252,7 +307,11 @@ export default function Editor() {
     }
 
     await waitForAudioMetadata(audio);
-    audio.currentTime = nextOffset;
+    await waitForAudioReady(audio);
+    audio.currentTime = Math.min(
+      getClipTrimStart(clip) + nextOffset,
+      Math.max(audio.duration - 0.05, 0),
+    );
   }, [activeAudioClip]);
 
   const stopPlayback = useCallback((resetToStart = true) => {
@@ -316,6 +375,8 @@ export default function Editor() {
       color: '#22c55e',
       start: 0,
       duration,
+      sourceDuration: duration,
+      trimStart: 0,
       assetUrl,
       waveform,
     };
@@ -347,7 +408,14 @@ export default function Editor() {
   }, [activeAudioClip?.duration, currentTime, registerObjectUrl]);
 
   const handleUpdateClip = useCallback((id: string, updates: Partial<Clip>) => {
-    setClips((currentClips) => updateClipCollection(currentClips, id, updates));
+    setClips((currentClips) => {
+      const clip = currentClips.find((currentClip) => currentClip.id === id);
+      if (!clip) {
+        return currentClips;
+      }
+
+      return updateClipCollection(currentClips, id, normalizeClipUpdates(clip, updates));
+    });
   }, []);
 
   const handleDragEnd = useCallback((clipId: string) => {
@@ -414,10 +482,16 @@ export default function Editor() {
     }
 
     await waitForAudioMetadata(audio);
-    audio.currentTime = clamp(playhead - clip.start, 0, Math.max(clip.duration - 0.05, 0));
+    await waitForAudioReady(audio);
+    audio.currentTime = Math.min(
+      getClipTrimStart(clip) + clamp(playhead - clip.start, 0, Math.max(clip.duration - 0.05, 0)),
+      Math.max(audio.duration - 0.05, 0),
+    );
     setCurrentTime(playhead);
 
     try {
+      audio.muted = false;
+      audio.volume = 1;
       await audio.play();
       setIsPlaying(true);
       setActiveAudioClipId(clip.id);
@@ -430,7 +504,10 @@ export default function Editor() {
     const audio = audioRef.current;
     if (audio && activeAudioClip) {
       audio.pause();
-      setCurrentTime(activeAudioClip.start + audio.currentTime);
+      setCurrentTime(
+        activeAudioClip.start
+          + clamp(audio.currentTime - getClipTrimStart(activeAudioClip), 0, activeAudioClip.duration),
+      );
     }
     setIsPlaying(false);
   }, [activeAudioClip]);
@@ -444,6 +521,8 @@ export default function Editor() {
   useEffect(() => {
     audioRef.current = new Audio();
     audioRef.current.preload = 'auto';
+    audioRef.current.muted = false;
+    audioRef.current.volume = 1;
 
     return () => {
       if (animationFrameRef.current !== null) {
@@ -508,7 +587,20 @@ export default function Editor() {
     if (!audio) return;
 
     const tick = () => {
-      setCurrentTime(activeAudioClip.start + audio.currentTime);
+      const trimStart = getClipTrimStart(activeAudioClip);
+      const trimEnd = getClipTrimEnd(activeAudioClip);
+      const clipTime = clamp(audio.currentTime - trimStart, 0, activeAudioClip.duration);
+
+      if (audio.currentTime >= trimEnd - 0.02 || clipTime >= activeAudioClip.duration - 0.02) {
+        audio.pause();
+        audio.currentTime = trimEnd;
+        setCurrentTime(activeAudioClip.start + activeAudioClip.duration);
+        setIsPlaying(false);
+        animationFrameRef.current = null;
+        return;
+      }
+
+      setCurrentTime(activeAudioClip.start + clipTime);
 
       if (!audio.paused && !audio.ended) {
         animationFrameRef.current = requestAnimationFrame(tick);

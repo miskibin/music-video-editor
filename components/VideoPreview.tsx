@@ -11,8 +11,6 @@ interface Props {
 export default function VideoPreview({ currentTime, isPlaying, visualClip, subtitleText }: Props) {
   const beatPulse = isPlaying ? (Math.sin((currentTime * 140 * Math.PI) / 60) + 1) / 2 : 0.18;
   const imageScale = 1 + beatPulse * 0.04;
-  const textOpacity = 0.72 + beatPulse * 0.28;
-  const textTranslate = isPlaying ? Math.sin(currentTime * 2.4) * -6 : 0;
   const baseColor = visualClip?.color ?? '#2563eb';
 
   return (
@@ -67,8 +65,8 @@ export default function VideoPreview({ currentTime, isPlaying, visualClip, subti
           <div
             className="max-w-[80%] rounded-3xl border border-white/12 bg-black/45 px-5 py-3 text-center text-xl font-semibold leading-tight text-white shadow-2xl backdrop-blur-md"
             style={{
-              opacity: textOpacity,
-              transform: `translateY(${textTranslate}px) scale(${0.98 + beatPulse * 0.03})`,
+              opacity: 1,
+              transform: 'none',
             }}
           >
             {subtitleText}

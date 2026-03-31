@@ -7,6 +7,7 @@ type DragAction = 'move' | 'resize-left' | 'resize-right';
 interface DraftClipPosition {
   start: number;
   duration: number;
+  trimStart?: number;
 }
 
 interface DragState {
@@ -17,12 +18,15 @@ interface DragState {
   latestClientX: number;
   initialStart: number;
   initialDuration: number;
+  initialTrimStart: number;
+  sourceDuration: number;
+  isAudioClip: boolean;
 }
 
+const MIN_CLIP_DURATION = 1;
+
 const getDraftClipPosition = (
-  action: DragAction,
-  initialStart: number,
-  initialDuration: number,
+  dragState: Pick<DragState, 'action' | 'initialStart' | 'initialDuration' | 'initialTrimStart' | 'sourceDuration' | 'isAudioClip'>,
   pixelsPerSecond: number,
   clientX: number,
   startX: number,
@@ -30,20 +34,56 @@ const getDraftClipPosition = (
   const deltaX = clientX - startX;
   const deltaTime = deltaX / pixelsPerSecond;
 
-  if (action === 'move') {
+  if (dragState.isAudioClip) {
+    if (dragState.action === 'move') {
+      return {
+        start: dragState.initialStart + deltaTime,
+        duration: dragState.initialDuration,
+        trimStart: dragState.initialTrimStart,
+      };
+    }
+
+    if (dragState.action === 'resize-left') {
+      const fixedTrimEnd = Math.min(
+        dragState.sourceDuration,
+        dragState.initialTrimStart + dragState.initialDuration,
+      );
+      const nextTrimStart = Math.min(
+        Math.max(dragState.initialTrimStart + deltaTime, 0),
+        Math.max(fixedTrimEnd - MIN_CLIP_DURATION, 0),
+      );
+
+      return {
+        start: dragState.initialStart + (nextTrimStart - dragState.initialTrimStart),
+        duration: fixedTrimEnd - nextTrimStart,
+        trimStart: nextTrimStart,
+      };
+    }
+
     return {
-      start: initialStart + deltaTime,
-      duration: initialDuration,
+      start: dragState.initialStart,
+      duration: Math.min(
+        Math.max(MIN_CLIP_DURATION, dragState.initialDuration + deltaTime),
+        Math.max(dragState.sourceDuration - dragState.initialTrimStart, MIN_CLIP_DURATION),
+      ),
+      trimStart: dragState.initialTrimStart,
     };
   }
 
-  if (action === 'resize-left') {
-    let nextStart = initialStart + deltaTime;
-    let nextDuration = initialDuration - deltaTime;
+  if (dragState.action === 'move') {
+    return {
+      start: dragState.initialStart + deltaTime,
+      duration: dragState.initialDuration,
+    };
+  }
 
-    if (nextDuration < 1) {
-      nextStart = initialStart + initialDuration - 1;
-      nextDuration = 1;
+  if (dragState.action === 'resize-left') {
+    let nextStart = dragState.initialStart + deltaTime;
+    let nextDuration = dragState.initialDuration - deltaTime;
+
+    if (nextDuration < MIN_CLIP_DURATION) {
+      nextStart = dragState.initialStart + dragState.initialDuration - MIN_CLIP_DURATION;
+      nextDuration = MIN_CLIP_DURATION;
     }
 
     return {
@@ -53,8 +93,8 @@ const getDraftClipPosition = (
   }
 
   return {
-    start: initialStart,
-    duration: Math.max(1, initialDuration + deltaTime),
+    start: dragState.initialStart,
+    duration: Math.max(MIN_CLIP_DURATION, dragState.initialDuration + deltaTime),
   };
 };
 
@@ -81,6 +121,7 @@ function TimelineClip({
   const [draftClipPosition, setDraftClipPosition] = React.useState<DraftClipPosition | null>(null);
   const displayedStart = draftClipPosition?.start ?? clip.start;
   const displayedDuration = draftClipPosition?.duration ?? clip.duration;
+  const displayedTrimStart = draftClipPosition?.trimStart ?? clip.trimStart ?? 0;
 
   const updateDraftPosition = React.useCallback(() => {
     frameRef.current = null;
@@ -91,9 +132,7 @@ function TimelineClip({
     }
 
     const nextPosition = getDraftClipPosition(
-      dragState.action,
-      dragState.initialStart,
-      dragState.initialDuration,
+      dragState,
       pixelsPerSecond,
       dragState.latestClientX,
       dragState.startX,
@@ -104,6 +143,7 @@ function TimelineClip({
         currentDraft
         && currentDraft.start === nextPosition.start
         && currentDraft.duration === nextPosition.duration
+        && currentDraft.trimStart === nextPosition.trimStart
       ) {
         return currentDraft;
       }
@@ -127,10 +167,14 @@ function TimelineClip({
       latestClientX: e.clientX,
       initialStart: clip.start,
       initialDuration: clip.duration,
+      initialTrimStart: clip.trimStart ?? 0,
+      sourceDuration: clip.sourceDuration ?? clip.duration,
+      isAudioClip,
     };
     setDraftClipPosition({
       start: clip.start,
       duration: clip.duration,
+      trimStart: clip.trimStart,
     });
 
     const onPointerMove = (moveEvent: PointerEvent) => {
@@ -157,9 +201,7 @@ function TimelineClip({
       }
 
       const nextPosition = getDraftClipPosition(
-        dragState.action,
-        dragState.initialStart,
-        dragState.initialDuration,
+        dragState,
         pixelsPerSecond,
         upEvent.clientX,
         dragState.startX,
@@ -179,6 +221,9 @@ function TimelineClip({
       if (nextPosition.duration !== clip.duration) {
         updates.duration = nextPosition.duration;
       }
+      if ((nextPosition.trimStart ?? 0) !== (clip.trimStart ?? 0)) {
+        updates.trimStart = nextPosition.trimStart;
+      }
 
       if (Object.keys(updates).length > 0) {
         onChange(clip.id, updates);
@@ -189,13 +234,25 @@ function TimelineClip({
 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
-  }, [clip.duration, clip.id, clip.start, onChange, onDragEnd, onSelect, pixelsPerSecond, updateDraftPosition]);
+  }, [
+    clip.duration,
+    clip.id,
+    clip.sourceDuration,
+    clip.start,
+    clip.trimStart,
+    isAudioClip,
+    onChange,
+    onDragEnd,
+    onSelect,
+    pixelsPerSecond,
+    updateDraftPosition,
+  ]);
 
   React.useEffect(() => {
     if (!dragStateRef.current) {
       setDraftClipPosition(null);
     }
-  }, [clip.duration, clip.start]);
+  }, [clip.duration, clip.start, clip.trimStart]);
 
   React.useEffect(() => () => {
     if (frameRef.current !== null) {
@@ -210,6 +267,11 @@ function TimelineClip({
     borderColor: 'rgba(255,255,255,0.2)',
   }), [clip.color, displayedDuration, displayedStart, pixelsPerSecond]);
 
+  const waveformSourceDuration = React.useMemo(
+    () => Math.max(clip.sourceDuration ?? clip.duration, clip.duration, MIN_CLIP_DURATION),
+    [clip.duration, clip.sourceDuration],
+  );
+
   const waveformHeights = React.useMemo(() => {
     const waveform = clip.waveform ?? [];
 
@@ -219,6 +281,11 @@ function TimelineClip({
 
     return waveform.map((bar) => Math.max(14, 18 + bar * 64));
   }, [clip.waveform, isAudioClip]);
+
+  const waveformStripStyle = React.useMemo(() => ({
+    width: `${waveformSourceDuration * pixelsPerSecond}px`,
+    transform: `translateX(${-displayedTrimStart * pixelsPerSecond}px)`,
+  }), [displayedTrimStart, pixelsPerSecond, waveformSourceDuration]);
 
   return (
     <div
@@ -230,14 +297,16 @@ function TimelineClip({
       style={clipStyle}
     >
       {isAudioClip && waveformHeights.length > 0 ? (
-        <div className="absolute inset-0 flex items-center gap-px px-2 opacity-45 pointer-events-none">
-          {waveformHeights.map((height, index) => (
-            <span
-              key={`${clip.id}-bar-${index}`}
-              className="flex-1 rounded-full bg-white/85"
-              style={{ height: `${height}%` }}
-            />
-          ))}
+        <div className="absolute inset-y-0 left-2 right-2 overflow-hidden opacity-45 pointer-events-none">
+          <div className="flex h-full items-center gap-px" style={waveformStripStyle}>
+            {waveformHeights.map((height, index) => (
+              <span
+                key={`${clip.id}-bar-${index}`}
+                className="h-auto min-w-px flex-1 rounded-full bg-white/85"
+                style={{ height: `${height}%` }}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
 
