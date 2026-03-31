@@ -114,7 +114,154 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
     textTransform: 'none',
     wordHighlightMode: 'none',
   },
+  'captions-cc': {
+    preset: 'captions-cc',
+    fontSize: 48,
+    textColor: '#fde047',
+    backgroundOpacity: 0.88,
+    backgroundColor: '#000000',
+    textOpacity: 1,
+    fontWeight: 800,
+    letterSpacing: 0,
+    bottomOffsetPx: 110,
+    horizontalOffsetPx: 0,
+    horizontalPaddingPx: 52,
+    maxWidthPercent: 92,
+    borderRadiusPx: 6,
+    backdropBlurPx: 0,
+    textTransform: 'none',
+    wordHighlightMode: 'none',
+  },
+  neon: {
+    preset: 'neon',
+    fontSize: 50,
+    textColor: '#67e8f9',
+    backgroundOpacity: 0.72,
+    backgroundColor: '#0c1220',
+    textOpacity: 1,
+    fontWeight: 800,
+    letterSpacing: -0.02,
+    bottomOffsetPx: 108,
+    horizontalOffsetPx: 0,
+    horizontalPaddingPx: 52,
+    maxWidthPercent: 88,
+    borderRadiusPx: 14,
+    backdropBlurPx: 14,
+    textTransform: 'none',
+    wordHighlightMode: 'none',
+  },
+  'soft-rose': {
+    preset: 'soft-rose',
+    fontSize: 42,
+    textColor: '#881337',
+    backgroundOpacity: 0.55,
+    backgroundColor: '#fff1f2',
+    textOpacity: 1,
+    fontWeight: 600,
+    letterSpacing: 0.01,
+    bottomOffsetPx: 128,
+    horizontalOffsetPx: 0,
+    horizontalPaddingPx: 64,
+    maxWidthPercent: 80,
+    borderRadiusPx: 20,
+    backdropBlurPx: 10,
+    textTransform: 'none',
+    wordHighlightMode: 'none',
+  },
+  'lyric-film': {
+    preset: 'lyric-film',
+    fontSize: 54,
+    textColor: '#fafaf0',
+    backgroundOpacity: 0.68,
+    backgroundColor: '#0a0a0a',
+    textOpacity: 1,
+    fontWeight: 600,
+    letterSpacing: 0.02,
+    bottomOffsetPx: 112,
+    horizontalOffsetPx: 0,
+    horizontalPaddingPx: 56,
+    maxWidthPercent: 86,
+    borderRadiusPx: 4,
+    backdropBlurPx: 8,
+    textTransform: 'none',
+    wordHighlightMode: 'none',
+  },
+  podcast: {
+    preset: 'podcast',
+    fontSize: 44,
+    textColor: '#fafafa',
+    backgroundOpacity: 0.62,
+    backgroundColor: '#27272a',
+    textOpacity: 1,
+    fontWeight: 600,
+    letterSpacing: 0,
+    bottomOffsetPx: 124,
+    horizontalOffsetPx: 0,
+    horizontalPaddingPx: 60,
+    maxWidthPercent: 84,
+    borderRadiusPx: 16,
+    backdropBlurPx: 12,
+    textTransform: 'none',
+    wordHighlightMode: 'none',
+  },
+  hype: {
+    preset: 'hype',
+    fontSize: 52,
+    textColor: '#ffffff',
+    backgroundOpacity: 0.8,
+    backgroundColor: '#6d28d9',
+    textOpacity: 1,
+    fontWeight: 900,
+    letterSpacing: -0.03,
+    bottomOffsetPx: 102,
+    horizontalOffsetPx: 0,
+    horizontalPaddingPx: 48,
+    maxWidthPercent: 90,
+    borderRadiusPx: 18,
+    backdropBlurPx: 10,
+    textTransform: 'uppercase',
+    wordHighlightMode: 'none',
+  },
 };
+
+/** One-tap transition + motion combos for the background track (global). */
+const VIDEO_QUICK_LOOKS: {
+  id: string;
+  label: string;
+  transition: TransitionConfig;
+  motion: MotionConfig;
+}[] = [
+  {
+    id: 'steady',
+    label: 'Steady',
+    transition: { kind: 'fade', duration: 0.45, ease: 'easeInOut' },
+    motion: { mode: 'none', strength: 0.2, sensitivity: 0.65, smoothness: 0.5, frequencyMultiplier: 1, decay: 0.55 },
+  },
+  {
+    id: 'beat-sync',
+    label: 'Beat sync',
+    transition: { kind: 'crossfade', duration: 0.5, ease: 'easeOut' },
+    motion: { mode: 'beat-pulse', strength: 0.28, sensitivity: 0.72, smoothness: 0.45, frequencyMultiplier: 1, decay: 0.52 },
+  },
+  {
+    id: 'slideshow',
+    label: 'Slideshow',
+    transition: { kind: 'slide', duration: 0.55, ease: 'easeInOut' },
+    motion: { mode: 'none', strength: 0.2, sensitivity: 0.65, smoothness: 0.5, frequencyMultiplier: 1, decay: 0.55 },
+  },
+  {
+    id: 'punch-cut',
+    label: 'Punch cut',
+    transition: { kind: 'flash', duration: 0.22, ease: 'easeIn' },
+    motion: { mode: 'kick-zoom', strength: 0.38, sensitivity: 0.7, smoothness: 0.4, frequencyMultiplier: 1.05, decay: 0.48 },
+  },
+  {
+    id: 'zoom-wash',
+    label: 'Zoom wash',
+    transition: { kind: 'zoom', duration: 0.5, ease: 'easeInOut' },
+    motion: { mode: 'none', strength: 0.2, sensitivity: 0.65, smoothness: 0.55, frequencyMultiplier: 1, decay: 0.55 },
+  },
+];
 
 const transitionKinds: TransitionConfig['kind'][] = [
   'none',
@@ -158,18 +305,43 @@ function PropertiesPanel({
   const trimEnd = clip ? Math.min(trimStart + clip.duration, sourceDuration) : 0;
   const durationValue = clip ? Number(clip.duration.toFixed(1)) : 0;
 
+  const inspectorContext =
+    clip == null
+      ? null
+      : isTextClip
+        ? 'Subtitle cue'
+        : isVideoClip
+          ? clip.visualType === 'video'
+            ? 'Video'
+            : 'Image / background'
+          : 'Music / audio';
+
   return (
     <aside className="flex w-96 shrink-0 flex-col overflow-hidden border-l border-zinc-800/80 bg-zinc-950">
-      <div className="flex h-11 shrink-0 items-center border-b border-zinc-800/80 px-4">
+      <div className="flex h-11 shrink-0 flex-col justify-center border-b border-zinc-800/80 px-4">
         <span className="text-xs font-medium text-zinc-400">Inspector</span>
+        {inspectorContext ? (
+          <span className="text-[11px] text-zinc-600">{inspectorContext}</span>
+        ) : null}
       </div>
 
       <div className="panel-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div className="flex flex-col gap-6">
+          {clip == null ? (
+            <section>
+              <p className="text-sm leading-relaxed text-zinc-500">
+                Select a clip on the timeline: subtitle cues for text styling and layout, background segments for
+                transitions and motion, or the music track for trim and fades.
+              </p>
+            </section>
+          ) : null}
+
+          {clip && isTextClip ? (
           <section>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Subtitles (all cues)</p>
             <p className="mb-3 text-[11px] text-zinc-600">
-              Style applies to every subtitle. Drag the dashed box on the preview to move and resize.
+              Style applies to every subtitle. Use the dashed box on the preview to move vertically and resize text
+              size and width (centered).
             </p>
 
             <div className="mb-3 flex flex-col gap-1.5">
@@ -185,34 +357,41 @@ function PropertiesPanel({
                 <option value="glass">Glass card</option>
                 <option value="tiktok-bold">TikTok bold</option>
                 <option value="minimal">Minimal</option>
-                <option value="outline">Outline</option>
+                <option value="outline">Outline (no box)</option>
+                <option value="captions-cc">Broadcast / CC yellow</option>
+                <option value="neon">Neon night</option>
+                <option value="soft-rose">Soft rose</option>
+                <option value="lyric-film">Lyric / film</option>
+                <option value="podcast">Podcast clean</option>
+                <option value="hype">Hype purple</option>
               </select>
             </div>
 
-            <div className="mb-3 grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-zinc-600">Size</Label>
-                <Input
-                  type="number"
-                  min={12}
-                  max={120}
-                  value={subtitleStyle.fontSize}
-                  onChange={(e) => onSubtitleStyleChange({ fontSize: Number(e.target.value) || 46 })}
-                  className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm text-zinc-200"
-                />
+            <div className="mb-3 flex flex-col gap-2 py-0.5">
+              <div className="flex justify-between text-[11px] text-zinc-600">
+                <span>Font size</span>
+                <span className="font-mono text-zinc-400">{subtitleStyle.fontSize}px</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-zinc-600">Weight</Label>
-                <Input
-                  type="number"
-                  min={100}
-                  max={900}
-                  step={100}
-                  value={subtitleStyle.fontWeight}
-                  onChange={(e) => onSubtitleStyleChange({ fontWeight: Number(e.target.value) || 700 })}
-                  className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm text-zinc-200"
-                />
-              </div>
+              <Slider
+                min={12}
+                max={120}
+                step={1}
+                value={[subtitleStyle.fontSize]}
+                onValueChange={([v]) => onSubtitleStyleChange({ fontSize: v ?? 46 })}
+              />
+            </div>
+
+            <div className="mb-3 flex flex-col gap-1">
+              <Label className="text-[11px] text-zinc-600">Weight</Label>
+              <Input
+                type="number"
+                min={100}
+                max={900}
+                step={100}
+                value={subtitleStyle.fontWeight}
+                onChange={(e) => onSubtitleStyleChange({ fontWeight: Number(e.target.value) || 700 })}
+                className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm text-zinc-200"
+              />
             </div>
 
             <div className="mb-3 grid grid-cols-2 gap-2">
@@ -264,29 +443,16 @@ function PropertiesPanel({
               />
             </div>
 
-            <div className="mb-3 grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-zinc-600">Bottom (px)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={600}
-                  value={subtitleStyle.bottomOffsetPx}
-                  onChange={(e) => onSubtitleStyleChange({ bottomOffsetPx: Number(e.target.value) || 120 })}
-                  className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm text-zinc-200"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-zinc-600">Shift X (px)</Label>
-                <Input
-                  type="number"
-                  min={-800}
-                  max={800}
-                  value={subtitleStyle.horizontalOffsetPx}
-                  onChange={(e) => onSubtitleStyleChange({ horizontalOffsetPx: Number(e.target.value) || 0 })}
-                  className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm text-zinc-200"
-                />
-              </div>
+            <div className="mb-3 flex flex-col gap-1">
+              <Label className="text-[11px] text-zinc-600">Bottom offset (px)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={600}
+                value={subtitleStyle.bottomOffsetPx}
+                onChange={(e) => onSubtitleStyleChange({ bottomOffsetPx: Number(e.target.value) || 120 })}
+                className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm text-zinc-200"
+              />
             </div>
 
             <div className="mb-3 flex flex-col gap-1">
@@ -334,9 +500,27 @@ function PropertiesPanel({
               ) : null}
             </div>
           </section>
+          ) : null}
 
-          <section className="border-t border-zinc-800/60 pt-4">
+          {clip && isVideoClip ? (
+          <section>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Video / background (all segments)</p>
+            <p className="mb-2 text-[11px] text-zinc-600">Quick looks apply transition + motion together; adjust sliders anytime.</p>
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {VIDEO_QUICK_LOOKS.map((look) => (
+                <button
+                  key={look.id}
+                  type="button"
+                  className="rounded-md border border-zinc-700/80 bg-zinc-900/80 px-2.5 py-1 text-[11px] text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800/90 hover:text-zinc-100"
+                  onClick={() => onGlobalBackgroundChange({
+                    transition: look.transition,
+                    motion: look.motion,
+                  })}
+                >
+                  {look.label}
+                </button>
+              ))}
+            </div>
 
             <div className="mb-3 flex flex-col gap-1.5">
               <Label className="text-[11px] text-zinc-600">Transition</Label>
@@ -488,8 +672,9 @@ function PropertiesPanel({
               />
             </div>
           </section>
+          ) : null}
 
-          {musicClip ? (
+          {clip && isAudioClip && musicClip ? (
             <section className="border-t border-zinc-800/60 pt-4">
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Music</p>
               <div className="mb-3 grid grid-cols-2 gap-2">
@@ -593,7 +778,9 @@ function PropertiesPanel({
 
           {clip ? (
             <section className="border-t border-zinc-800/60 pt-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Selected clip</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                {isTextClip ? 'This cue' : isVideoClip ? 'This segment' : 'This track'}
+              </p>
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-[11px] text-zinc-600">Type</span>
                 <span className="rounded-md bg-zinc-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
@@ -692,11 +879,7 @@ function PropertiesPanel({
                 ) : null}
               </div>
             </section>
-          ) : (
-            <section className="border-t border-zinc-800/60 pt-4">
-              <p className="text-sm text-zinc-500">Select a clip on the timeline to edit its timing, name, or line text.</p>
-            </section>
-          )}
+          ) : null}
         </div>
       </div>
     </aside>

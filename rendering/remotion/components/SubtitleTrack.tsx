@@ -2,6 +2,21 @@ import { AbsoluteFill, Sequence, spring, useCurrentFrame, useVideoConfig } from 
 import type { RenderSubtitleCue, RenderSubtitleWord } from '../../../lib/render';
 import type { SubtitleStyle } from '../../../lib/types';
 
+const OUTLINE_LIKE_SHADOW = '0 0 2px rgba(0,0,0,0.95), 0 2px 12px rgba(0,0,0,0.85)';
+
+function captionShadowForPreset(preset: SubtitleStyle['preset']): string | undefined {
+  if (
+    preset === 'outline'
+    || preset === 'captions-cc'
+    || preset === 'lyric-film'
+    || preset === 'neon'
+    || preset === 'hype'
+  ) {
+    return OUTLINE_LIKE_SHADOW;
+  }
+  return undefined;
+}
+
 type Props = {
   cues: RenderSubtitleCue[];
   subtitleStyle: SubtitleStyle;
@@ -64,21 +79,41 @@ const SubtitleCard = ({ cue, style }: { cue: RenderSubtitleCue; style: SubtitleS
       return text;
     }
 
-    return cue.words.map((word: RenderSubtitleWord, index: number) => {
-      const piece = applyTextTransform(word.text, style.textTransform);
-      const dim = activeWordIndex >= 0 && index !== activeWordIndex ? 0.45 : 1;
+    /** Between timed words, findIndex is -1; old logic treated that as “all bright” and caused flashing. */
+    const inactiveOpacity = 0.42;
+
+    const words = cue.words.map((word: RenderSubtitleWord, index: number) => {
+      const raw = word.text.replace(/\s+/g, ' ').trim();
+      const piece = applyTextTransform(raw, style.textTransform);
+      const isActive = activeWordIndex >= 0 && index === activeWordIndex;
+      const opacity = isActive ? 1 : inactiveOpacity;
       return (
         <span
           key={word.id}
           style={{
-            opacity: dim * style.textOpacity,
+            opacity,
             marginRight: '0.25em',
+            whiteSpace: 'nowrap',
           }}
         >
           {piece}
         </span>
       );
     });
+
+    /** Single line: no wrapping between words (typical karaoke). Long lines may extend; tune max width / size in the editor. */
+    return (
+      <span
+        style={{
+          display: 'inline-block',
+          maxWidth: '100%',
+          whiteSpace: 'nowrap',
+          textAlign: 'center',
+        }}
+      >
+        {words}
+      </span>
+    );
   };
 
   return (
@@ -104,11 +139,12 @@ const SubtitleCard = ({ cue, style }: { cue: RenderSubtitleCue; style: SubtitleS
           letterSpacing: `${letterSpacingPx}px`,
           backdropFilter: `blur(${style.backdropBlurPx}px)`,
           boxShadow: '0 18px 48px rgba(0, 0, 0, 0.35)',
-          textShadow: style.preset === 'outline'
-            ? '0 0 2px rgba(0,0,0,0.95), 0 2px 12px rgba(0,0,0,0.85)'
-            : undefined,
+          textShadow: captionShadowForPreset(style.preset),
           transform: `translateY(${18 - entrance * 18}px) scale(${0.97 + entrance * 0.03})`,
           opacity: entrance * style.textOpacity,
+          ...(style.wordHighlightMode === 'karaoke' && cue.words.length > 0
+            ? { overflow: 'visible' as const }
+            : {}),
         }}
       >
         {style.wordHighlightMode === 'karaoke' && cue.words.length > 0 ? renderKaraoke() : text}

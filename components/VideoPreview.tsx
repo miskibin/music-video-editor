@@ -29,6 +29,13 @@ export default function VideoPreview({
   return (
     <div className="flex items-center justify-center w-full h-full min-h-0">
       <div className="relative h-full aspect-[9/16] rounded-lg overflow-hidden border border-zinc-800 shadow-2xl bg-black">
+        {showSubtitleOverlay ? (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 border-b border-zinc-800/80 bg-zinc-950/90 px-2 py-1.5 backdrop-blur-sm">
+            <p className="text-center text-[10px] leading-tight text-zinc-400">
+              Layout: drag frame up/down · corner for size & width
+            </p>
+          </div>
+        ) : null}
         <VideoPreviewPlayer currentTime={currentTime} manifest={manifest} />
         <SubtitleLayoutOverlay
           subtitleStyle={subtitleStyle}

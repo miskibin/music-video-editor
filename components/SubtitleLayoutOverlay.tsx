@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { SubtitleStyle } from '@/lib/types';
 
 const COMPOSITION_WIDTH = 1080;
@@ -43,10 +43,6 @@ export function SubtitleLayoutOverlay({
     return el.clientWidth / COMPOSITION_WIDTH;
   };
 
-  const endDrag = useCallback(() => {
-    dragRef.current = null;
-  }, []);
-
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       const d = dragRef.current;
@@ -58,15 +54,14 @@ export function SubtitleLayoutOverlay({
         return;
       }
 
-      const dx = e.clientX - d.startX;
-      const dy = e.clientY - d.startY;
-
       if (d.kind === 'move') {
         onSubtitleStyleChange({
           horizontalOffsetPx: 0,
           bottomOffsetPx: clamp(d.startBottom - (e.clientY - d.startY) / s, 0, 600),
         });
       } else {
+        const dx = e.clientX - d.startX;
+        const dy = e.clientY - d.startY;
         onSubtitleStyleChange({
           horizontalOffsetPx: 0,
           maxWidthPercent: clamp(d.startMaxW + (dx / s) * 0.1, 40, 100),
@@ -98,10 +93,8 @@ export function SubtitleLayoutOverlay({
     e.stopPropagation();
     dragRef.current = {
       kind: 'move',
-      startX: e.clientX,
       startY: e.clientY,
       startBottom: subtitleStyle.bottomOffsetPx,
-      startOffset: subtitleStyle.horizontalOffsetPx,
     };
   };
 
@@ -143,18 +136,15 @@ export function SubtitleLayoutOverlay({
         <div
           role="presentation"
           onPointerDown={startMove}
-          className={`relative w-full rounded-md border-2 border-dashed border-emerald-400/90 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.35)] ${
+          className={`relative w-full rounded-md border border-dashed border-emerald-400/45 bg-emerald-500/[0.06] shadow-[inset_0_0_0_1px_rgba(16,185,129,0.12)] ${
             enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-60'
           }`}
         >
-          <span className="pointer-events-none absolute -top-7 left-1/2 max-w-[calc(100%-8px)] -translate-x-1/2 text-center text-[10px] font-medium uppercase tracking-wide text-emerald-400/90">
-            Drag up/down · corner: text size & width
-          </span>
           <button
             type="button"
             aria-label="Resize subtitle text size and box width"
             onPointerDown={startResize}
-            className="pointer-events-auto absolute -right-1 -bottom-1 size-3 rounded-sm border border-emerald-300 bg-emerald-500/80 hover:bg-emerald-400 cursor-nwse-resize"
+            className="pointer-events-auto absolute -right-1 -bottom-1 size-3 rounded-sm border border-emerald-400/70 bg-emerald-600/90 hover:bg-emerald-500 cursor-nwse-resize"
           />
         </div>
       </div>

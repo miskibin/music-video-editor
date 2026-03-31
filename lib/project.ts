@@ -64,7 +64,18 @@ const motionSchema = z.object({
 });
 
 const subtitleStyleSchema = z.object({
-  preset: z.enum(['glass', 'tiktok-bold', 'minimal', 'outline']),
+  preset: z.enum([
+    'glass',
+    'tiktok-bold',
+    'minimal',
+    'outline',
+    'captions-cc',
+    'neon',
+    'soft-rose',
+    'lyric-film',
+    'podcast',
+    'hype',
+  ]),
   fontSize: z.number().min(12).max(120),
   textColor: z.string(),
   backgroundOpacity: z.number().min(0).max(1),

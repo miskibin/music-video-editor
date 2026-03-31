@@ -11,7 +11,17 @@ export type AlignmentLanguage = 'en' | 'pl';
 export type SubtitleAlignmentStatus = 'idle' | 'running' | 'review' | 'applied' | 'error';
 
 /** Visual preset id for subtitle appearance (sidebar + Remotion). */
-export type SubtitleStylePreset = 'glass' | 'tiktok-bold' | 'minimal' | 'outline';
+export type SubtitleStylePreset =
+  | 'glass'
+  | 'tiktok-bold'
+  | 'minimal'
+  | 'outline'
+  | 'captions-cc'
+  | 'neon'
+  | 'soft-rose'
+  | 'lyric-film'
+  | 'podcast'
+  | 'hype';
 
 export type SubtitleTextTransform = 'none' | 'uppercase' | 'lowercase';
 

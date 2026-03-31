@@ -13,15 +13,15 @@ function Slider({
   max = 100,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  )
+  const _values = React.useMemo(() => {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (Array.isArray(defaultValue)) {
+      return defaultValue;
+    }
+    return [min];
+  }, [value, defaultValue, min])
 
   return (
     <SliderPrimitive.Root
@@ -31,25 +31,29 @@ function Slider({
       min={min}
       max={max}
       className={cn(
-        "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
+        "relative flex w-full touch-none select-none items-center data-[orientation=horizontal]:min-h-9 data-[orientation=vertical]:min-h-40 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col data-disabled:opacity-50",
         className
       )}
       {...props}
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className="relative grow overflow-hidden rounded-full bg-zinc-700/90 data-horizontal:h-2 data-horizontal:w-full data-vertical:h-full data-vertical:w-1.5"
+        className={cn(
+          "relative grow overflow-hidden rounded-full bg-zinc-700",
+          "data-[orientation=horizontal]:h-2.5 data-[orientation=horizontal]:w-full",
+          "data-[orientation=vertical]:h-full data-[orientation=vertical]:w-2",
+        )}
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="absolute bg-zinc-300 select-none data-horizontal:h-full data-vertical:w-full"
+          className="absolute bg-zinc-200 data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
-          className="relative block size-4 shrink-0 rounded-full border-2 border-zinc-200 bg-white shadow-md ring-2 ring-zinc-900/30 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+          className="relative block size-[18px] shrink-0 cursor-grab rounded-full border-2 border-zinc-100 bg-white shadow-md ring-2 ring-zinc-950/40 transition-[box-shadow] hover:ring-zinc-300/80 active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-50"
         />
       ))}
     </SliderPrimitive.Root>
