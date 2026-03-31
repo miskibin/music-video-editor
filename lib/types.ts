@@ -34,6 +34,8 @@ export interface MusicClip {
   sourceDuration?: number;
   trimStart?: number;
   waveform?: number[];
+  /** Estimated from audio when uploaded; used for beat grid and motion preview. */
+  bpm?: number | null;
 }
 
 export interface SubtitleWord {
@@ -154,6 +156,7 @@ export interface Clip {
   visualType?: VisualType;
   overlayText?: string;
   waveform?: number[];
+  bpm?: number | null;
 }
 
 export interface Track {

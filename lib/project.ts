@@ -63,6 +63,7 @@ const musicClipSchema = z.object({
   sourceDuration: z.number().min(MIN_CLIP_DURATION).optional(),
   trimStart: z.number().min(0).optional(),
   waveform: z.array(z.number()).optional(),
+  bpm: z.number().min(40).max(240).nullable().optional(),
 });
 
 const subtitleWordSchema = z.object({
@@ -338,6 +339,37 @@ const normalizeTrimmedRange = (duration: number, sourceDuration?: number, trimSt
   };
 };
 
+/** Subtitle cue `start` / `duration` are seconds on the music asset timeline (same as WhisperX). */
+export const subtitleCueToTimelineClipProps = (
+  cue: SubtitleCue,
+  music: MusicClip,
+): { start: number; duration: number } | null => {
+  const trimStart = music.trimStart ?? 0;
+  const windowEnd = trimStart + music.duration;
+  const s0 = cue.start;
+  const s1 = cue.start + cue.duration;
+  const vis0 = Math.max(s0, trimStart);
+  const vis1 = Math.min(s1, windowEnd);
+  if (vis1 - vis0 < MIN_CLIP_DURATION) {
+    return null;
+  }
+
+  return {
+    start: music.start + (vis0 - trimStart),
+    duration: Math.max(MIN_CLIP_DURATION, vis1 - vis0),
+  };
+};
+
+/** Timeline seconds (after trim) → source seconds on the file. */
+export const timelineSubtitleEditToSource = (
+  timelineStart: number,
+  timelineDuration: number,
+  music: MusicClip,
+): { start: number; duration: number } => ({
+  start: Math.max(0, timelineStart - music.start + (music.trimStart ?? 0)),
+  duration: Math.max(MIN_CLIP_DURATION, timelineDuration),
+});
+
 const markProjectUpdated = (project: EditorProject): EditorProject => ({
   ...project,
   updatedAt: nowIso(),
@@ -466,6 +498,24 @@ export const buildTimelineClips = (
   });
 
   project.subtitles.cues.forEach((cue) => {
+    if (project.music.clip) {
+      const mapped = subtitleCueToTimelineClipProps(cue, project.music.clip);
+      if (!mapped) {
+        return;
+      }
+
+      clips.push({
+        id: cue.id,
+        trackId: SUBTITLE_TRACK_ID,
+        name: cue.text || 'Subtitle Cue',
+        color: '#d946ef',
+        start: mapped.start,
+        duration: mapped.duration,
+        overlayText: cue.text,
+      });
+      return;
+    }
+
     clips.push({
       id: cue.id,
       trackId: SUBTITLE_TRACK_ID,
@@ -683,16 +733,39 @@ export const updateTimelineClipInProject = (
 
   const subtitleCue = project.subtitles.cues.find((cue) => cue.id === clipId);
   if (subtitleCue) {
+    const music = project.music.clip;
     const nextCues = project.subtitles.cues.map((cue) => {
       if (cue.id !== clipId) {
         return cue;
       }
 
+      const nextText = updates.overlayText ?? updates.name ?? cue.text;
+
+      if (!music) {
+        return {
+          ...cue,
+          start: Math.max(0, updates.start ?? cue.start),
+          duration: Math.max(MIN_CLIP_DURATION, updates.duration ?? cue.duration),
+          text: nextText,
+        };
+      }
+
+      const mapped = subtitleCueToTimelineClipProps(cue, music);
+      const fallbackTimelineStart = music.start + Math.max(0, cue.start - (music.trimStart ?? 0));
+      const timelineStart = updates.start ?? mapped?.start ?? fallbackTimelineStart;
+      const timelineDuration = updates.duration ?? mapped?.duration ?? cue.duration;
+
+      const { start: sourceStart, duration: sourceDuration } = timelineSubtitleEditToSource(
+        timelineStart,
+        timelineDuration,
+        music,
+      );
+
       return {
         ...cue,
-        start: Math.max(0, updates.start ?? cue.start),
-        duration: Math.max(MIN_CLIP_DURATION, updates.duration ?? cue.duration),
-        text: updates.overlayText ?? updates.name ?? cue.text,
+        start: sourceStart,
+        duration: sourceDuration,
+        text: nextText,
       };
     });
 

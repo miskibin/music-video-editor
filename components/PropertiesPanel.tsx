@@ -2,7 +2,6 @@
 import React from 'react';
 import { Clip } from '@/lib/types';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 interface Props {
   clip: Clip | null;
@@ -29,17 +28,12 @@ const formatTime = (seconds: number) => {
   return `${minutes.toString().padStart(2, '0')}:${wholeSeconds.toString().padStart(2, '0')}.${tenths}`;
 };
 
-const formatSeconds = (seconds: number) => `${seconds.toFixed(1)}s`;
-
 function PropertiesPanel({ clip, onChange }: Props) {
   if (!clip) {
     return (
-      <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-zinc-800/80 bg-zinc-950">
-        <div className="flex h-full items-center justify-center px-6 text-center">
-          <div className="flex max-w-44 flex-col gap-2">
-            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Inspector</p>
-            <p className="text-sm text-zinc-400">Select a clip to edit its details.</p>
-          </div>
+      <aside className="flex w-96 shrink-0 flex-col overflow-hidden border-l border-zinc-800/80 bg-zinc-950">
+        <div className="flex h-full items-center justify-center px-8 text-center">
+          <p className="text-sm text-zinc-500">Select a clip to edit.</p>
         </div>
       </aside>
     );
@@ -54,123 +48,86 @@ function PropertiesPanel({ clip, onChange }: Props) {
   const durationValue = Number(clip.duration.toFixed(1));
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-zinc-800/80 bg-zinc-950">
-      <div className="flex h-12 items-center border-b border-zinc-800/80 px-4 shrink-0">
-        <h2 className="text-sm font-medium text-zinc-200">Clip Properties</h2>
+    <aside className="flex w-96 shrink-0 flex-col overflow-hidden border-l border-zinc-800/80 bg-zinc-950">
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-zinc-800/80 px-4">
+        <span className="text-xs font-medium text-zinc-500">Clip</span>
+        <span className="rounded-md bg-zinc-900 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          {clipKind}
+        </span>
       </div>
 
-      <div className="panel-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <div className="flex flex-col gap-3">
-          <section className="flex flex-col gap-4 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Inspector</p>
-                <p className="mt-1 truncate text-sm font-medium text-zinc-100">{clip.name}</p>
-              </div>
-              <span className="rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-400">
-                {clipKind}
-              </span>
+      <div className="panel-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex flex-col gap-5">
+          {isTextClip ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] text-zinc-600">Subtitle</span>
+              <Input
+                id="clip-subtitle-line"
+                type="text"
+                value={clip.overlayText ?? clip.name}
+                onChange={(e) => onChange(clip.id, { overlayText: e.target.value })}
+                className="h-9 border-zinc-800/60 bg-transparent text-sm text-zinc-100 focus-visible:ring-1 focus-visible:ring-zinc-600"
+              />
             </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Start</p>
-                <p className="mt-1 font-mono text-sm text-zinc-200">{formatTime(clip.start)}</p>
-              </div>
-              <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">End</p>
-                <p className="mt-1 font-mono text-sm text-zinc-200">{formatTime(clip.start + clip.duration)}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Details</p>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="clip-name" className="text-xs font-medium text-zinc-400">Name</Label>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] text-zinc-600">Name</span>
               <Input
                 id="clip-name"
                 type="text"
                 value={clip.name}
                 onChange={(e) => onChange(clip.id, { name: e.target.value })}
-                className="h-9 border-zinc-800/80 bg-zinc-950/80 text-zinc-100 focus-visible:ring-zinc-600"
+                className="h-9 border-zinc-800/60 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-zinc-600"
+                placeholder="Name"
               />
             </div>
+          )}
 
-            {isTextClip ? (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="clip-text" className="text-xs font-medium text-zinc-400">Overlay Text</Label>
-                <Input
-                  id="clip-text"
-                  type="text"
-                  value={clip.overlayText ?? ''}
-                  onChange={(e) => onChange(clip.id, { overlayText: e.target.value })}
-                  className="h-9 border-zinc-800/80 bg-zinc-950/80 text-zinc-100 focus-visible:ring-zinc-600"
-                />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] text-zinc-600">Duration (s)</span>
+            <Input
+              id="clip-duration"
+              type="number"
+              min={1}
+              step={0.1}
+              value={durationValue}
+              onChange={(e) => onChange(clip.id, { duration: Math.max(1, Number(e.target.value) || 1) })}
+              className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm tabular-nums text-zinc-200 focus-visible:ring-1 focus-visible:ring-zinc-600"
+            />
+          </div>
+
+          <div className="border-t border-zinc-800/60 pt-4">
+            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Timeline</p>
+            <div className="flex flex-col gap-2 font-mono text-xs tabular-nums text-zinc-400">
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-600">Start</span>
+                <span className="text-zinc-300">{formatTime(clip.start)}</span>
               </div>
-            ) : null}
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="clip-duration" className="text-xs font-medium text-zinc-400">Duration</Label>
-              <Input
-                id="clip-duration"
-                type="number"
-                min={1}
-                step={0.1}
-                value={durationValue}
-                onChange={(e) => onChange(clip.id, { duration: Math.max(1, Number(e.target.value) || 1) })}
-                className="h-9 border-zinc-800/80 bg-zinc-950/80 font-mono text-zinc-100 focus-visible:ring-zinc-600"
-              />
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Timing</p>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Start</p>
-                <p className="mt-1 font-mono text-sm text-zinc-200">{formatTime(clip.start)}</p>
-              </div>
-              <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Length</p>
-                <p className="mt-1 font-mono text-sm text-zinc-200">{formatSeconds(clip.duration)}</p>
+              <div className="flex justify-between gap-3">
+                <span className="text-zinc-600">End</span>
+                <span className="text-zinc-300">{formatTime(clip.start + clip.duration)}</span>
               </div>
             </div>
 
             {isAudioClip ? (
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Trim In</p>
-                  <p className="mt-1 font-mono text-sm text-zinc-200">{formatTime(trimStart)}</p>
+              <div className="mt-3 flex flex-col gap-2 border-t border-zinc-800/40 pt-3 font-mono text-xs tabular-nums text-zinc-400">
+                <div className="flex justify-between gap-3">
+                  <span className="text-zinc-600">Trim</span>
+                  <span className="text-zinc-300">
+                    {formatTime(trimStart)}
+                    {' '}
+                    —
+                    {' '}
+                    {formatTime(trimEnd)}
+                  </span>
                 </div>
-                <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Trim Out</p>
-                  <p className="mt-1 font-mono text-sm text-zinc-200">{formatTime(trimEnd)}</p>
-                </div>
-                <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Source</p>
-                  <p className="mt-1 font-mono text-sm text-zinc-200">{formatSeconds(sourceDuration)}</p>
+                <div className="flex justify-between gap-3">
+                  <span className="text-zinc-600">Source</span>
+                  <span className="text-zinc-300">{sourceDuration.toFixed(1)}s</span>
                 </div>
               </div>
             ) : null}
-          </section>
-
-          <section className="flex flex-col gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Asset</p>
-
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Source</p>
-                <p className="mt-1 text-zinc-300">{clip.assetId ? 'Uploaded' : 'Sample'}</p>
-              </div>
-              <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Style</p>
-                <p className="mt-1 text-zinc-300">{clip.visualType ?? clipKind}</p>
-              </div>
-            </div>
-          </section>
+          </div>
         </div>
       </div>
     </aside>

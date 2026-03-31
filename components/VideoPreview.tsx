@@ -7,15 +7,19 @@ interface Props {
   isPlaying: boolean;
   visualClip: Clip | null;
   subtitleText: string;
+  /** Estimated music BPM; falls back to 140 for beat-pulse motion when unknown. */
+  beatBpm?: number | null;
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-export default function VideoPreview({ currentTime, isPlaying, visualClip, subtitleText }: Props) {
+export default function VideoPreview({ currentTime, isPlaying, visualClip, subtitleText, beatBpm }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const beatPulse = isPlaying ? (Math.sin((currentTime * 140 * Math.PI) / 60) + 1) / 2 : 0.18;
+  const bpmForMotion = beatBpm ?? 140;
+  const beatPulse = isPlaying ? (Math.sin((currentTime * bpmForMotion * Math.PI) / 60) + 1) / 2 : 0.18;
   const baseColor = visualClip?.color ?? '#2563eb';
   const isVideoClip = visualClip?.assetKind === 'video' || visualClip?.visualType === 'video';
+  const hasSubtitle = subtitleText.trim().length > 0;
   const visualOffset = useMemo(() => {
     if (!visualClip) {
       return 0;
@@ -45,7 +49,9 @@ export default function VideoPreview({ currentTime, isPlaying, visualClip, subti
   return (
     <div className="flex items-center justify-center w-full h-full min-h-0">
       <div className="relative h-full aspect-[9/16] rounded-lg overflow-hidden border border-zinc-800 shadow-2xl bg-black">
-        {visualClip?.assetUrl && isVideoClip ? (
+        {!visualClip ? (
+          <div className="absolute inset-0 bg-black" />
+        ) : visualClip.assetUrl && isVideoClip ? (
           <video
             ref={videoRef}
             src={visualClip.assetUrl}
@@ -53,7 +59,7 @@ export default function VideoPreview({ currentTime, isPlaying, visualClip, subti
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
           />
-        ) : visualClip?.assetUrl ? (
+        ) : visualClip.assetUrl ? (
           <Image
             src={visualClip.assetUrl}
             alt={visualClip.name}
@@ -94,17 +100,19 @@ export default function VideoPreview({ currentTime, isPlaying, visualClip, subti
           </div>
         </div>
 
-        <div className="absolute inset-x-6 bottom-16 flex justify-center">
-          <div
-            className="max-w-[80%] rounded-3xl border border-white/12 bg-black/45 px-5 py-3 text-center text-xl font-semibold leading-tight text-white shadow-2xl backdrop-blur-md"
-            style={{
-              opacity: 1,
-              transform: 'none',
-            }}
-          >
-            {subtitleText}
+        {hasSubtitle ? (
+          <div className="absolute inset-x-6 bottom-16 flex justify-center">
+            <div
+              className="max-w-[80%] rounded-3xl border border-white/12 bg-black/45 px-5 py-3 text-center text-xl font-semibold leading-tight text-white shadow-2xl backdrop-blur-md"
+              style={{
+                opacity: 1,
+                transform: 'none',
+              }}
+            >
+              {subtitleText}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="absolute inset-4 border border-zinc-800/50 border-dashed pointer-events-none rounded" />
 

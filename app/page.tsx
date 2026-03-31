@@ -4,8 +4,10 @@ import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import SubtitleAlignmentModal from '@/components/SubtitleAlignmentModal';
 import VideoPreview from '@/components/VideoPreview';
+import PreviewWorkspacePanel from '@/components/PreviewWorkspacePanel';
 import Timeline from '@/components/Timeline';
 import PropertiesPanel from '@/components/PropertiesPanel';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { AssetRecord, BackgroundSegment, Clip, MusicClip, SubtitleAlignmentInput, SubtitleCue } from '@/lib/types';
 import {
   ACTIVE_PROJECT_ID,
@@ -37,6 +39,7 @@ import {
   persistProject,
 } from '@/lib/project-storage';
 import {
+  estimateBpmFromAudioUrl,
   extractWaveformPeaks,
   getAudioDuration,
   getImageMetadata,
@@ -52,10 +55,6 @@ type SaveState = 'loading' | 'saving' | 'saved' | 'error';
 const AUDIO_TRACK_ID = 'a1';
 const VIDEO_TRACK_ID = 'v1';
 const TEXT_TRACK_ID = 't1';
-const TIMELINE_CHROME_HEIGHT = 64;
-const TIMELINE_TRACK_HEIGHT = 48;
-const TIMELINE_BOTTOM_PADDING = 4;
-const TIMELINE_HEIGHT = TIMELINE_CHROME_HEIGHT + (TIMELINE_TRACKS.length * TIMELINE_TRACK_HEIGHT) + TIMELINE_BOTTOM_PADDING;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -146,16 +145,23 @@ export default function Editor() {
     () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === TEXT_TRACK_ID)),
     [timelineClips],
   );
+  const timelineDuration = useMemo(() => {
+    const musicEnd = musicClip ? musicClip.start + musicClip.duration : 0;
+    const visualsEnd = getTrackMaxEnd(sortedVisualClips);
+    const textEnd = getTrackMaxEnd(sortedTextClips);
+    const bgEnd = getTrackMaxEnd(project.background.segments);
+    return Math.max(musicEnd, visualsEnd, textEnd, bgEnd, 1);
+  }, [musicClip, project.background.segments, sortedTextClips, sortedVisualClips]);
   const activeVisualClip = useMemo(
-    () => findClipAtTime(sortedVisualClips, currentTime) || sortedVisualClips[0] || null,
+    () => findClipAtTime(sortedVisualClips, currentTime),
     [currentTime, sortedVisualClips],
   );
   const activeTextClip = useMemo(
-    () => findClipAtTime(sortedTextClips, currentTime) || sortedTextClips[0] || null,
+    () => findClipAtTime(sortedTextClips, currentTime),
     [currentTime, sortedTextClips],
   );
   const subtitleText = useMemo(
-    () => activeTextClip?.overlayText || project.subtitles.sourceText || 'Your subtitles here',
+    () => activeTextClip?.overlayText ?? '',
     [activeTextClip, project.subtitles.sourceText],
   );
   const subtitleAlignmentInput = useMemo<SubtitleAlignmentInput>(() => {
@@ -165,7 +171,7 @@ export default function Editor() {
 
     const excerptEnd = Math.max(
       MIN_CLIP_DURATION,
-      Math.min(musicClip?.duration ?? project.background.segments[0]?.duration ?? 12, 30),
+      musicClip?.duration ?? project.background.segments[0]?.duration ?? 12,
     );
 
     return {
@@ -179,12 +185,8 @@ export default function Editor() {
     () => [
       project.lyricSync.subtitleAlignment.status,
       project.lyricSync.subtitleAlignment.result?.generatedAt ?? 'no-result',
-      project.lyricSync.subtitleAlignment.input?.excerptStart ?? 0,
-      project.lyricSync.subtitleAlignment.input?.excerptEnd ?? 0,
     ].join(':'),
     [
-      project.lyricSync.subtitleAlignment.input?.excerptEnd,
-      project.lyricSync.subtitleAlignment.input?.excerptStart,
       project.lyricSync.subtitleAlignment.result?.generatedAt,
       project.lyricSync.subtitleAlignment.status,
     ],
@@ -341,9 +343,10 @@ export default function Editor() {
     const temporaryUrl = URL.createObjectURL(file);
 
     try {
-      const [duration, waveform] = await Promise.all([
+      const [duration, waveform, bpm] = await Promise.all([
         getAudioDuration(temporaryUrl),
         extractWaveformPeaks(temporaryUrl),
+        estimateBpmFromAudioUrl(temporaryUrl),
       ]);
       const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
       const assetId = createId();
@@ -363,6 +366,7 @@ export default function Editor() {
         sourceDuration: safeDuration,
         trimStart: 0,
         waveform,
+        bpm: bpm ?? null,
       };
 
       stopPlayback();
@@ -728,6 +732,7 @@ export default function Editor() {
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-50">
       <TopBar
         projectName={project.name}
+        musicBpm={musicClip?.bpm ?? null}
         saveState={saveState}
         onSave={handleSave}
         onOpenSubtitleAlignment={handleOpenSubtitleAlignment}
@@ -741,37 +746,71 @@ export default function Editor() {
           onUploadMusic={handleUploadMusic}
           onUploadBackgroundMedia={handleUploadBackgroundMedia}
         />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex flex-1 overflow-hidden">
-            <div className="flex flex-1 items-center justify-center bg-zinc-900 p-4">
-              <VideoPreview
-                currentTime={currentTime}
-                isPlaying={isPlaying}
-                visualClip={activeVisualClip}
-                subtitleText={subtitleText}
-              />
-            </div>
-            <PropertiesPanel clip={selectedClip} onChange={handleUpdateClip} />
-          </div>
-          <div className="shrink-0 border-t border-zinc-800 bg-zinc-950" style={{ height: `${TIMELINE_HEIGHT}px` }}>
-            <Timeline
-              tracks={TIMELINE_TRACKS}
-              clips={timelineClips}
-              selectedClipId={selectedClipId}
-              onSelectClip={setSelectedClipId}
-              onChangeClip={handleUpdateClip}
-              onDeleteClip={handleDeleteClip}
-              onDragEnd={handleDragEnd}
-              currentTime={currentTime}
-              onTimeChange={handleTimeChange}
-              isPlaying={isPlaying}
-              hasPlayableAudio={Boolean(musicClip?.assetUrl)}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onStop={stopPlayback}
-              onStepTime={handleStepTime}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <ResizablePanelGroup orientation="vertical" className="flex min-h-0 flex-1 flex-col">
+            <ResizablePanel
+              id="workspace"
+              defaultSize="76%"
+              minSize="35%"
+              className="flex min-h-0 flex-col"
+            >
+              <div className="flex min-h-0 flex-1 overflow-hidden">
+                <PreviewWorkspacePanel
+                  projectName={project.name}
+                  currentTime={currentTime}
+                  timelineDuration={timelineDuration}
+                  bpm={musicClip?.bpm ?? null}
+                  activeVisualName={activeVisualClip?.name ?? null}
+                  subtitleLine={subtitleText}
+                  subtitleCueCount={project.subtitles.cues.length}
+                  backgroundSegmentCount={project.background.segments.length}
+                />
+                <div className="preview-stage flex min-h-0 min-w-0 flex-1 flex-col bg-zinc-900">
+                  <div className="flex min-h-0 flex-1 items-center justify-center">
+                    <VideoPreview
+                      currentTime={currentTime}
+                      isPlaying={isPlaying}
+                      visualClip={activeVisualClip}
+                      subtitleText={subtitleText}
+                      beatBpm={musicClip?.bpm ?? null}
+                    />
+                  </div>
+                </div>
+                <PropertiesPanel clip={selectedClip} onChange={handleUpdateClip} />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle
+              withHandle
+              className="h-2 shrink-0 border-0 bg-zinc-800 hover:bg-zinc-700"
             />
-          </div>
+            <ResizablePanel
+              id="timeline-stack"
+              defaultSize="24%"
+              minSize="200px"
+              maxSize="65%"
+              className="flex min-h-0 flex-col border-t border-zinc-800 bg-zinc-950"
+            >
+              <Timeline
+                tracks={TIMELINE_TRACKS}
+                clips={timelineClips}
+                selectedClipId={selectedClipId}
+                onSelectClip={setSelectedClipId}
+                onChangeClip={handleUpdateClip}
+                onDeleteClip={handleDeleteClip}
+                onDragEnd={handleDragEnd}
+                currentTime={currentTime}
+                onTimeChange={handleTimeChange}
+                isPlaying={isPlaying}
+                hasPlayableAudio={Boolean(musicClip?.assetUrl)}
+                onPlay={handlePlay}
+                onPause={handlePause}
+                onStop={stopPlayback}
+                onStepTime={handleStepTime}
+                beatBpm={musicClip?.bpm ?? null}
+                beatGridStartSec={musicClip?.start ?? 0}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
       </div>
       {isSubtitleAlignmentOpen ? (

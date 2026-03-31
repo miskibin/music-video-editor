@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { AlertCircle, LoaderCircle, Sparkles, WandSparkles, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, LoaderCircle, WandSparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { SubtitleAlignmentInput, SubtitleAlignmentState, SubtitleCue } from '@/lib/types';
+import { SubtitleAlignmentInput, SubtitleAlignmentState, SubtitleCue, SubtitleWord } from '@/lib/types';
 
 interface Props {
   musicDuration: number | null;
@@ -19,7 +18,152 @@ interface Props {
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-const formatWordTiming = (startMs: number, endMs: number) => `${(startMs / 1000).toFixed(2)}s - ${(endMs / 1000).toFixed(2)}s`;
+const formatWordTiming = (startMs: number, endMs: number) => `${(startMs / 1000).toFixed(2)}s – ${(endMs / 1000).toFixed(2)}s`;
+
+type GroupingMode = 'backend' | 'single' | 'short' | 'medium';
+
+const GROUPING_PRESETS: Record<GroupingMode, { label: string; maxWords: number }> = {
+  backend: { label: 'Your line breaks (verses)', maxWords: 0 },
+  single: { label: '1 word', maxWords: 1 },
+  short: { label: 'Tight timing · max 4 words', maxWords: 4 },
+  medium: { label: 'Tight timing · max 7 words', maxWords: 7 },
+};
+
+const gapBetween = (left: SubtitleWord, right: SubtitleWord) => Math.max(0, right.startMs - left.endMs);
+
+/** Larger gaps between words → new cue; threshold adapts to the song’s typical spacing. */
+const adaptiveBreakThresholdMs = (gaps: number[]): number => {
+  if (gaps.length === 0) {
+    return 400;
+  }
+  const sorted = [...gaps].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const p75 = sorted[Math.floor((sorted.length - 1) * 0.75)];
+  return Math.min(1200, Math.max(100, median * 2.2 + (p75 - median)));
+};
+
+const createCue = (words: SubtitleWord[], index: number): SubtitleCue => {
+  const first = words[0];
+  const last = words[words.length - 1];
+  const start = first.startMs / 1000;
+  const end = last.endMs / 1000;
+
+  return {
+    id: `cue-${index + 1}`,
+    start,
+    duration: Math.max(0.05, end - start),
+    text: words.map((word) => word.text).join(' '),
+    words,
+  };
+};
+
+const getPreferredCueLength = (maxWords: number) => {
+  if (maxWords <= 1) {
+    return 1;
+  }
+
+  if (maxWords <= 4) {
+    return 3;
+  }
+
+  return 5;
+};
+
+const getSegmentCost = (
+  words: SubtitleWord[],
+  gaps: number[],
+  thresholdMs: number,
+  startIndex: number,
+  endIndex: number,
+  maxWords: number,
+) => {
+  const length = endIndex - startIndex + 1;
+  const preferredLength = getPreferredCueLength(maxWords);
+  const leftGap = startIndex === 0 ? thresholdMs : gaps[startIndex - 1];
+  const rightGap = endIndex === words.length - 1 ? thresholdMs : gaps[endIndex];
+
+  let internalGapPenalty = 0;
+  let maxInternalGapRatio = 0;
+  for (let index = startIndex; index < endIndex; index += 1) {
+    const gapRatio = gaps[index] / thresholdMs;
+    internalGapPenalty += gapRatio ** 2.4;
+    maxInternalGapRatio = Math.max(maxInternalGapRatio, gapRatio);
+  }
+
+  const sizePenalty = length >= preferredLength
+    ? 0
+    : ((preferredLength - length) / preferredLength) * 0.2;
+
+  const isolationRatio = Math.max(leftGap, rightGap) / thresholdMs;
+  const singletonPenalty = length === 1 && maxWords > 1
+    ? Math.max(0, 0.85 - (isolationRatio * 0.65))
+    : 0;
+
+  const durationMs = Math.max(1, words[endIndex].endMs - words[startIndex].startMs);
+  const durationPenalty = maxWords > 1
+    ? Math.max(0, (durationMs - 2600) / 1400) * 0.18
+    : 0;
+
+  return internalGapPenalty + (maxInternalGapRatio * 0.35) + sizePenalty + singletonPenalty + durationPenalty;
+};
+
+/**
+ * Groups words with dynamic programming so each split can look ahead.
+ * This lets a borderline word stay with the current cue or move to the next one
+ * depending on which global segmentation has the lower timing cost.
+ */
+const groupWordsByTimeProximity = (words: SubtitleWord[], maxWords: number): SubtitleCue[] => {
+  if (words.length === 0) {
+    return [];
+  }
+  if (maxWords <= 1) {
+    return words.map((word, index) => createCue([word], index));
+  }
+
+  const sorted = [...words].sort((a, b) => a.startMs - b.startMs);
+  const gaps: number[] = [];
+  for (let i = 0; i < sorted.length - 1; i += 1) {
+    gaps.push(gapBetween(sorted[i], sorted[i + 1]));
+  }
+  const thresholdMs = adaptiveBreakThresholdMs(gaps);
+  const bestCostFrom = new Array<number>(sorted.length + 1).fill(Number.POSITIVE_INFINITY);
+  const nextBreakAt = new Array<number>(sorted.length).fill(-1);
+  bestCostFrom[sorted.length] = 0;
+
+  for (let startIndex = sorted.length - 1; startIndex >= 0; startIndex -= 1) {
+    for (
+      let endIndex = startIndex;
+      endIndex < Math.min(sorted.length, startIndex + maxWords);
+      endIndex += 1
+    ) {
+      const segmentCost = getSegmentCost(sorted, gaps, thresholdMs, startIndex, endIndex, maxWords);
+      const totalCost = segmentCost + bestCostFrom[endIndex + 1];
+
+      if (totalCost < bestCostFrom[startIndex]) {
+        bestCostFrom[startIndex] = totalCost;
+        nextBreakAt[startIndex] = endIndex + 1;
+      }
+    }
+  }
+
+  const cues: SubtitleCue[] = [];
+  let cursor = 0;
+  while (cursor < sorted.length) {
+    const nextCursor = nextBreakAt[cursor];
+    if (nextCursor <= cursor) {
+      break;
+    }
+
+    cues.push(createCue(sorted.slice(cursor, nextCursor), cues.length));
+    cursor = nextCursor;
+  }
+
+  if (cursor < sorted.length) {
+    cues.push(createCue(sorted.slice(cursor), cues.length));
+  }
+
+  return cues;
+};
 
 export default function SubtitleAlignmentModal({
   musicDuration,
@@ -30,7 +174,16 @@ export default function SubtitleAlignmentModal({
   onApply,
 }: Props) {
   const [draftInput, setDraftInput] = useState(initialInput);
-  const [draftCues, setDraftCues] = useState<SubtitleCue[]>(alignmentState.result?.cues ?? []);
+  const [groupingMode, setGroupingMode] = useState<GroupingMode>('backend');
+  const [draftWords, setDraftWords] = useState<SubtitleWord[]>(
+    alignmentState.result?.cues.flatMap((cue) => cue.words) ?? [],
+  );
+
+  useEffect(() => {
+    if (alignmentState.result?.cues?.length) {
+      setDraftWords(alignmentState.result.cues.flatMap((cue) => cue.words));
+    }
+  }, [alignmentState.result?.generatedAt]);
 
   const maxExcerptEnd = useMemo(() => {
     if (musicDuration === null) {
@@ -40,15 +193,40 @@ export default function SubtitleAlignmentModal({
     return Math.max(1, Number(musicDuration.toFixed(1)));
   }, [musicDuration]);
 
+  const groupedCues = useMemo(() => {
+    const result = alignmentState.result;
+    if (groupingMode === 'backend' && result?.cues.length) {
+      const expected = result.cues.reduce((sum, c) => sum + c.words.length, 0);
+      if (draftWords.length === expected) {
+        let i = 0;
+        return result.cues.map((cue) => {
+          const n = cue.words.length;
+          const words = draftWords.slice(i, i + n);
+          i += n;
+          return {
+            ...cue,
+            words,
+            text: words.map((w) => w.text).join(' '),
+          };
+        });
+      }
+    }
+    const preset = GROUPING_PRESETS[groupingMode];
+    if (groupingMode === 'backend') {
+      return groupWordsByTimeProximity(draftWords, 4);
+    }
+    return groupWordsByTimeProximity(draftWords, preset.maxWords);
+  }, [alignmentState.result, draftWords, groupingMode]);
+
   const lowConfidenceWordIds = useMemo(
     () => new Set(alignmentState.result?.lowConfidenceWordIds ?? []),
     [alignmentState.result?.lowConfidenceWordIds],
   );
   const isRunning = alignmentState.status === 'running';
-  const hasResult = draftCues.length > 0;
+  const hasResult = draftWords.length > 0;
   const canRun = musicDuration !== null
     && draftInput.sourceText.trim().length > 0
-    && draftInput.excerptEnd > draftInput.excerptStart;
+    && maxExcerptEnd > 0;
 
   const handleInputChange = <K extends keyof SubtitleAlignmentInput>(key: K, value: SubtitleAlignmentInput[K]) => {
     setDraftInput((currentInput) => ({
@@ -57,33 +235,10 @@ export default function SubtitleAlignmentModal({
     }));
   };
 
-  const handleCueChange = (cueId: string, updates: Partial<SubtitleCue>) => {
-    setDraftCues((currentCues) => currentCues.map((cue) => {
-      if (cue.id !== cueId) {
-        return cue;
-      }
-
-      return {
-        ...cue,
-        ...updates,
-      };
-    }));
-  };
-
-  const handleWordChange = (cueId: string, wordId: string, nextText: string) => {
-    setDraftCues((currentCues) => currentCues.map((cue) => {
-      if (cue.id !== cueId) {
-        return cue;
-      }
-
-      const nextWords = cue.words.map((word) => word.id === wordId ? { ...word, text: nextText } : word);
-
-      return {
-        ...cue,
-        words: nextWords,
-        text: nextWords.map((word) => word.text).join(' '),
-      };
-    }));
+  const handleWordChange = (wordId: string, nextText: string) => {
+    setDraftWords((currentWords) => currentWords.map((word) => (
+      word.id === wordId ? { ...word, text: nextText } : word
+    )));
   };
 
   const handleRun = () => {
@@ -93,8 +248,8 @@ export default function SubtitleAlignmentModal({
 
     onRun({
       ...draftInput,
-      excerptStart: clamp(Number(draftInput.excerptStart.toFixed(1)), 0, maxExcerptEnd),
-      excerptEnd: clamp(Number(draftInput.excerptEnd.toFixed(1)), 0, maxExcerptEnd),
+      excerptStart: 0,
+      excerptEnd: clamp(Number(maxExcerptEnd.toFixed(1)), 0, maxExcerptEnd),
       sourceText: draftInput.sourceText.trim(),
     });
   };
@@ -102,12 +257,8 @@ export default function SubtitleAlignmentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
       <div className="flex h-[min(90vh,860px)] w-[min(1040px,100%)] flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-500">Lyric Sync</p>
-            <h2 className="mt-1 text-lg font-semibold text-zinc-100">Lyrics Timing Review</h2>
-            <p className="mt-1 text-sm text-zinc-400">Generate draft lyric timings for the selected excerpt, review the cues, then apply them to the project.</p>
-          </div>
+        <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <p className="text-sm font-medium text-zinc-200">Lyric Sync</p>
           <Button
             variant="ghost"
             size="icon"
@@ -122,11 +273,6 @@ export default function SubtitleAlignmentModal({
         <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[340px_1fr]">
           <div className="flex min-h-0 flex-col gap-5 border-r border-zinc-800 px-6 py-5">
             <section className="space-y-3">
-              <div>
-                <p className="text-sm font-medium text-zinc-100">Inputs</p>
-                <p className="mt-1 text-xs text-zinc-500">This first Lyric Sync backend iteration uses excerpt timing plus provided lyrics. It does not analyze the audio waveform yet.</p>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="alignment-language" className="text-xs font-medium text-zinc-400">Language</Label>
                 <select
@@ -141,42 +287,11 @@ export default function SubtitleAlignmentModal({
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="excerpt-start" className="text-xs font-medium text-zinc-400">Excerpt Start</Label>
-                  <Input
-                    id="excerpt-start"
-                    type="number"
-                    min={0}
-                    max={maxExcerptEnd}
-                    step={0.1}
-                    value={draftInput.excerptStart}
-                    disabled={isRunning || musicDuration === null}
-                    onChange={(event) => handleInputChange('excerptStart', Math.max(0, Number(event.target.value) || 0))}
-                    className="h-9 border-zinc-800/80 bg-zinc-950/80 text-zinc-100 focus-visible:ring-zinc-600"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="excerpt-end" className="text-xs font-medium text-zinc-400">Excerpt End</Label>
-                  <Input
-                    id="excerpt-end"
-                    type="number"
-                    min={0}
-                    max={maxExcerptEnd}
-                    step={0.1}
-                    value={draftInput.excerptEnd}
-                    disabled={isRunning || musicDuration === null}
-                    onChange={(event) => handleInputChange('excerptEnd', Math.max(0, Number(event.target.value) || 0))}
-                    className="h-9 border-zinc-800/80 bg-zinc-950/80 text-zinc-100 focus-visible:ring-zinc-600"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-xs text-zinc-400">
+              <p className="text-xs text-zinc-500">
                 {musicDuration === null
-                  ? 'Upload music first to set the alignment excerpt against the song duration.'
-                  : `Music duration available: ${musicDuration.toFixed(1)}s`}
-              </div>
+                  ? 'Upload music first.'
+                  : `${musicDuration.toFixed(1)}s`}
+              </p>
 
               <div className="space-y-2">
                 <Label htmlFor="alignment-lyrics" className="text-xs font-medium text-zinc-400">Lyrics</Label>
@@ -185,7 +300,8 @@ export default function SubtitleAlignmentModal({
                   value={draftInput.sourceText}
                   onChange={(event) => handleInputChange('sourceText', event.target.value)}
                   disabled={isRunning}
-                  placeholder="Paste the raw lyrics block for the selected excerpt."
+                  placeholder="Paste the raw lyrics block for the whole song."
+                  className="min-h-64 max-h-[55vh] resize-y overflow-y-auto"
                 />
               </div>
             </section>
@@ -215,111 +331,70 @@ export default function SubtitleAlignmentModal({
             </div>
           </div>
 
-          <div className="min-h-0 overflow-y-auto px-6 py-5">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-zinc-100">Review</p>
-                <p className="mt-1 text-xs text-zinc-500">Low-confidence words are highlighted for review before the cues are applied to the timeline.</p>
-              </div>
-              {alignmentState.result ? (
-                <div className="rounded-full border border-zinc-800 bg-zinc-900/70 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-zinc-400">
-                  {alignmentState.result.provider}
-                </div>
-              ) : null}
-            </div>
-
+          <div className="flex min-h-0 flex-col overflow-hidden px-4 py-3">
             {!hasResult ? (
-              <div className="flex h-full min-h-64 items-center justify-center rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/20 px-6 text-center text-sm text-zinc-500">
+              <div className="flex min-h-48 flex-1 items-center justify-center text-center text-sm text-zinc-500">
                 {isRunning
                   ? (
-                    <div className="flex items-center gap-3 text-zinc-300">
+                    <div className="flex items-center gap-2 text-zinc-300">
                       <LoaderCircle className="h-5 w-5 animate-spin" />
-                      <span>Generating cue timings from the selected excerpt.</span>
+                      <span>Syncing…</span>
                     </div>
                   )
-                  : 'Run alignment to review generated subtitle cues and word timings.'}
+                  : 'Run Lyric Sync to preview.'}
               </div>
             ) : (
-              <div className="space-y-4 pb-2">
-                {draftCues.map((cue, cueIndex) => (
-                  <section key={cue.id} className="rounded-3xl border border-zinc-800 bg-zinc-900/30 p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Cue {cueIndex + 1}</p>
-                        <p className="mt-1 text-sm text-zinc-400">{cue.words.length} words</p>
-                      </div>
-                      <Sparkles className="h-4 w-4 text-zinc-500" />
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-[1fr_110px_110px]">
-                      <div className="space-y-2">
-                        <Label htmlFor={`cue-text-${cue.id}`} className="text-xs font-medium text-zinc-400">Cue Text</Label>
-                        <Input
-                          id={`cue-text-${cue.id}`}
-                          value={cue.text}
-                          onChange={(event) => handleCueChange(cue.id, { text: event.target.value })}
-                          className="h-9 border-zinc-800/80 bg-zinc-950/80 text-zinc-100 focus-visible:ring-zinc-600"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`cue-start-${cue.id}`} className="text-xs font-medium text-zinc-400">Start</Label>
-                        <Input
-                          id={`cue-start-${cue.id}`}
-                          type="number"
-                          min={0}
-                          step={0.1}
-                          value={cue.start}
-                          onChange={(event) => handleCueChange(cue.id, { start: Math.max(0, Number(event.target.value) || 0) })}
-                          className="h-9 border-zinc-800/80 bg-zinc-950/80 text-zinc-100 focus-visible:ring-zinc-600"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`cue-duration-${cue.id}`} className="text-xs font-medium text-zinc-400">Duration</Label>
-                        <Input
-                          id={`cue-duration-${cue.id}`}
-                          type="number"
-                          min={1}
-                          step={0.1}
-                          value={cue.duration}
-                          onChange={(event) => handleCueChange(cue.id, { duration: Math.max(1, Number(event.target.value) || 1) })}
-                          className="h-9 border-zinc-800/80 bg-zinc-950/80 text-zinc-100 focus-visible:ring-zinc-600"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {cue.words.map((word) => {
-                        const isLowConfidence = lowConfidenceWordIds.has(word.id);
-
-                        return (
-                          <label
-                            key={word.id}
-                            className={`flex min-w-28 flex-col gap-1 rounded-2xl border px-3 py-2 ${isLowConfidence ? 'border-amber-400/40 bg-amber-400/10' : 'border-zinc-800 bg-zinc-950/70'}`}
-                          >
-                            <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{formatWordTiming(word.startMs, word.endMs)}</span>
-                            <input
-                              value={word.text}
-                              onChange={(event) => handleWordChange(cue.id, word.id, event.target.value)}
-                              className="border-none bg-transparent p-0 text-sm font-medium text-zinc-100 outline-none"
-                            />
-                            <span className={`text-[10px] ${isLowConfidence ? 'text-amber-200' : 'text-zinc-500'}`}>
-                              {word.confidence === null ? 'Confidence unavailable' : `Confidence ${Math.round(word.confidence * 100)}%`}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))}
-
-                <div className="sticky bottom-0 pt-2">
-                  <div className="flex justify-end rounded-2xl border border-zinc-800 bg-zinc-950/90 px-4 py-3 backdrop-blur-sm">
-                    <Button onClick={() => onApply(draftCues)} className="bg-white text-black hover:bg-zinc-200">
-                      Apply to Project
-                    </Button>
-                  </div>
+              <>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Label htmlFor="grouping-mode" className="text-xs text-zinc-500">Group</Label>
+                  <select
+                    id="grouping-mode"
+                    value={groupingMode}
+                    onChange={(event) => setGroupingMode(event.target.value as GroupingMode)}
+                    className="h-8 min-w-[12rem] rounded border border-zinc-800 bg-zinc-950 px-2 text-sm text-zinc-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600"
+                    disabled={isRunning}
+                  >
+                    {Object.entries(GROUPING_PRESETS).map(([key, preset]) => (
+                      <option key={key} value={key}>{preset.label}</option>
+                    ))}
+                  </select>
+                  {alignmentState.result ? (
+                    <span className="text-xs text-zinc-600">{alignmentState.result.provider}</span>
+                  ) : null}
                 </div>
-              </div>
+
+                <div className="min-h-0 flex-1 space-y-0 overflow-y-auto border-t border-zinc-800/80">
+                  {groupedCues.map((cue) => (
+                    <div key={cue.id} className="border-b border-zinc-800/60 py-3">
+                      <p className="mb-2 text-[11px] text-zinc-500">{formatWordTiming(cue.words[0].startMs, cue.words[cue.words.length - 1].endMs)}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cue.words.map((word) => {
+                          const isLowConfidence = lowConfidenceWordIds.has(word.id);
+
+                          return (
+                            <label
+                              key={word.id}
+                              className={`inline-flex rounded-md border px-2 py-1 ${isLowConfidence ? 'border-amber-400/40 bg-amber-400/10' : 'border-zinc-800/90 bg-zinc-950/40'}`}
+                            >
+                              <input
+                                value={word.text}
+                                onChange={(event) => handleWordChange(word.id, event.target.value)}
+                                className="min-w-[2ch] max-w-[40ch] bg-transparent text-sm text-zinc-100 outline-none"
+                              />
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 flex justify-end border-t border-zinc-800 pt-3">
+                  <Button onClick={() => onApply(groupedCues)} className="bg-white text-black hover:bg-zinc-200">
+                    Apply to Project
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </div>

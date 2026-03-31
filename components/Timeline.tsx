@@ -25,6 +25,10 @@ interface Props {
   onPause: () => void;
   onStop: () => void;
   onStepTime: (delta: number) => void;
+  /** Estimated music BPM; enables bar lines (every 4 beats) on the ruler and tracks. */
+  beatBpm?: number | null;
+  /** Timeline time (seconds) where bar 0 aligns (music clip start). */
+  beatGridStartSec?: number;
 }
 
 const EMPTY_CLIPS: Clip[] = [];
@@ -45,6 +49,8 @@ export default function Timeline({
   onPause,
   onStop,
   onStepTime,
+  beatBpm = null,
+  beatGridStartSec = 0,
 }: Props) {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [zoom, setZoom] = useState(1);
@@ -87,6 +93,23 @@ export default function Timeline({
     () => ({ width: `${timelineWidth}px` }),
     [timelineWidth],
   );
+  const beatTimes = useMemo(() => {
+    if (beatBpm == null || beatBpm <= 0) {
+      return [];
+    }
+    const beatsPerBar = 4;
+    const barIntervalSec = (60 / beatBpm) * beatsPerBar;
+    const out: number[] = [];
+    const kStart = Math.ceil((0 - beatGridStartSec) / barIntervalSec);
+    const maxK = Math.ceil(timelineDuration / barIntervalSec) + 2;
+    for (let k = kStart; k < kStart + maxK; k++) {
+      const t = beatGridStartSec + k * barIntervalSec;
+      if (t >= 0 && t < timelineDuration) {
+        out.push(t);
+      }
+    }
+    return out;
+  }, [beatBpm, beatGridStartSec, timelineDuration]);
   const playheadStyle = useMemo(
     () => ({ left: `${currentTime * pixelsPerSecond}px` }),
     [currentTime, pixelsPerSecond],
@@ -263,7 +286,7 @@ export default function Timeline({
           className="flex-1 overflow-hidden cursor-text relative"
           onPointerDown={handleRulerPointerDown}
         >
-          <div className="flex items-end h-full" style={rulerWidthStyle}>
+          <div className="relative flex items-end h-full" style={rulerWidthStyle}>
             {rulerSegments.map((segmentStart) => (
               <div key={segmentStart} className="relative h-full border-l border-zinc-700/50 shrink-0" style={{ width: `${pixelsPerSecond * 5}px` }}>
                 <span className="absolute top-1 left-1 text-[10px] text-zinc-500 font-mono pointer-events-none">
@@ -271,6 +294,13 @@ export default function Timeline({
                 </span>
                 <div className="absolute bottom-0 left-1/2 w-px h-2 bg-zinc-700/50 pointer-events-none" />
               </div>
+            ))}
+            {beatTimes.map((t) => (
+              <div
+                key={`beat-${t}`}
+                className="absolute bottom-0 w-px h-2.5 bg-amber-500/50 pointer-events-none z-[8]"
+                style={{ left: `${t * pixelsPerSecond}px` }}
+              />
             ))}
           </div>
 
@@ -280,26 +310,43 @@ export default function Timeline({
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto overflow-x-auto relative [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-zinc-950 [&::-webkit-scrollbar-thumb]:bg-zinc-800 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-zinc-700"
-      >
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto overflow-x-auto relative [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-zinc-950 [&::-webkit-scrollbar-thumb]:bg-zinc-800 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-zinc-700"
+        >
         <div className="absolute top-0 bottom-0 w-px bg-red-500 z-30 pointer-events-none" style={trackPlayheadStyle} />
 
-        {tracks.map((track) => (
-          <TimelineTrack
-            key={track.id}
-            track={track}
-            width={timelineWidth}
-            clips={clipsByTrack.get(track.id) || EMPTY_CLIPS}
-            selectedClipId={selectedClipId}
-            pixelsPerSecond={pixelsPerSecond}
-            onSelectClip={onSelectClip}
-            onChangeClip={onChangeClip}
-            onDragEnd={onDragEnd}
-          />
-        ))}
+        <div className="relative w-max min-w-full">
+          {beatTimes.length > 0 ? (
+            <div
+              className="pointer-events-none absolute left-40 top-0 bottom-0 z-[8]"
+              style={{ width: `${timelineWidth}px` }}
+            >
+              {beatTimes.map((t) => (
+                <div
+                  key={`track-beat-${t}`}
+                  className="absolute top-0 bottom-0 w-px bg-amber-500/25"
+                  style={{ left: `${t * pixelsPerSecond}px` }}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {tracks.map((track) => (
+            <TimelineTrack
+              key={track.id}
+              track={track}
+              width={timelineWidth}
+              clips={clipsByTrack.get(track.id) || EMPTY_CLIPS}
+              selectedClipId={selectedClipId}
+              pixelsPerSecond={pixelsPerSecond}
+              onSelectClip={onSelectClip}
+              onChangeClip={onChangeClip}
+              onDragEnd={onDragEnd}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

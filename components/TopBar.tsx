@@ -8,6 +8,7 @@ type SaveState = 'loading' | 'saving' | 'saved' | 'error';
 
 interface Props {
   projectName: string;
+  musicBpm: number | null;
   saveState: SaveState;
   onSave: () => void;
   onOpenSubtitleAlignment: () => void;
@@ -17,6 +18,7 @@ interface Props {
 
 function TopBar({
   projectName,
+  musicBpm,
   saveState,
   onSave,
   onOpenSubtitleAlignment,
@@ -42,6 +44,12 @@ function TopBar({
     <header className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-4">
         <div className="font-semibold text-sm">{projectName}</div>
+        {musicBpm != null ? (
+          <>
+            <Separator orientation="vertical" className="h-6 bg-zinc-800" />
+            <span className="text-xs font-mono text-zinc-400 tabular-nums">{musicBpm} BPM</span>
+          </>
+        ) : null}
         <Separator orientation="vertical" className="h-6 bg-zinc-800" />
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" disabled className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-40">

@@ -72,7 +72,7 @@ app.add_middleware(
 
 def _align_subtitles(request: SubtitleAlignmentRequest, audio_path: str) -> SubtitleAlignmentResponse:
     from lyrics_timings import user_word_timings
-    from subtitle_common import build_cue_texts, extract_words
+    from subtitle_common import cue_word_index_ranges, extract_words
     from whisperx_align import run_whisperx_alignment
 
     excerpt_duration = request.excerptEnd - request.excerptStart
@@ -87,35 +87,29 @@ def _align_subtitles(request: SubtitleAlignmentRequest, audio_path: str) -> Subt
         request.excerptEnd,
     )
 
-    word_rows = user_word_timings(request.sourceText, aligned, excerpt_duration)
+    word_rows, timing_warnings = user_word_timings(request.sourceText, aligned, excerpt_duration)
 
-    cue_texts = build_cue_texts(request.sourceText, excerpt_duration)
-    if not cue_texts:
-        raise HTTPException(status_code=400, detail="No lyrics could be extracted from sourceText.")
+    try:
+        ranges = cue_word_index_ranges(request.sourceText, excerpt_duration)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    cue_words = [extract_words(cue_text) for cue_text in cue_texts]
-    total_word_count = sum(len(words) for words in cue_words)
-    if total_word_count != len(word_rows):
-        raise HTTPException(status_code=500, detail="Internal cue/word split mismatch.")
+    if len(word_rows) != len(extract_words(request.sourceText)):
+        raise HTTPException(status_code=500, detail="Word timing count does not match lyrics.")
 
-    warnings: list[str] = []
+    warnings: list[str] = list(timing_warnings)
     if not (aligned.get("word_segments") or []):
         warnings.append("No ASR words; timings were spread evenly across your lyrics.")
 
     low_confidence_word_ids: list[str] = []
     cues: list[SubtitleCueResponse] = []
 
-    idx = 0
-    for words in cue_words:
-        if not words:
-            continue
-
+    for start, end in ranges:
         aligned_words: list[SubtitleWordResponse] = []
         cue_start_ms: int | None = None
 
-        for _ in words:
+        for idx in range(start, end):
             utext, rs, re, conf = word_rows[idx]
-            idx += 1
             word_start_ms = excerpt_start_ms + round(rs * 1000)
             word_end_ms = excerpt_start_ms + round(re * 1000)
             word_end_ms = min(max(word_end_ms, word_start_ms + 1), excerpt_end_ms)
@@ -149,6 +143,10 @@ def _align_subtitles(request: SubtitleAlignmentRequest, audio_path: str) -> Subt
                 words=aligned_words,
             )
         )
+
+    flat_texts = [w.text for cue in cues for w in cue.words]
+    if flat_texts != extract_words(request.sourceText):
+        raise HTTPException(status_code=500, detail="Response words must match uploaded lyrics exactly.")
 
     return SubtitleAlignmentResponse(
         provider="whisperx",
