@@ -3,7 +3,12 @@
 import React, { useMemo } from 'react';
 import { MIN_CLIP_DURATION } from '@/lib/project';
 import { Clip } from '@/lib/types';
-import type { MotionConfig, SubtitleStyle, SubtitleStylePreset, TransitionConfig } from '@/lib/types';
+import type {
+  MotionConfig,
+  SubtitleStyle,
+  SubtitleStylePreset,
+  TransitionConfig,
+} from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -62,14 +67,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   'tiktok-bold': {
     preset: 'tiktok-bold',
-    fontSize: 52,
+    fontSize: 58,
     textColor: '#fef08a',
     backgroundOpacity: 0.78,
     backgroundColor: '#000000',
     textOpacity: 1,
     fontWeight: 900,
     letterSpacing: -0.02,
-    bottomOffsetPx: 100,
+    bottomOffsetPx: 160,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 48,
     maxWidthPercent: 90,
@@ -80,14 +85,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   minimal: {
     preset: 'minimal',
-    fontSize: 40,
+    fontSize: 46,
     textColor: '#fafafa',
     backgroundOpacity: 0.22,
     backgroundColor: '#18181b',
     textOpacity: 1,
     fontWeight: 600,
     letterSpacing: 0,
-    bottomOffsetPx: 140,
+    bottomOffsetPx: 200,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 72,
     maxWidthPercent: 78,
@@ -98,14 +103,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   outline: {
     preset: 'outline',
-    fontSize: 44,
+    fontSize: 50,
     textColor: '#ffffff',
     backgroundOpacity: 0,
     backgroundColor: '#000000',
     textOpacity: 1,
     fontWeight: 800,
     letterSpacing: -0.02,
-    bottomOffsetPx: 120,
+    bottomOffsetPx: 180,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 56,
     maxWidthPercent: 88,
@@ -116,14 +121,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   'captions-cc': {
     preset: 'captions-cc',
-    fontSize: 48,
+    fontSize: 54,
     textColor: '#fde047',
     backgroundOpacity: 0.88,
     backgroundColor: '#000000',
     textOpacity: 1,
     fontWeight: 800,
     letterSpacing: 0,
-    bottomOffsetPx: 110,
+    bottomOffsetPx: 175,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 52,
     maxWidthPercent: 92,
@@ -134,14 +139,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   neon: {
     preset: 'neon',
-    fontSize: 50,
+    fontSize: 56,
     textColor: '#67e8f9',
     backgroundOpacity: 0.72,
     backgroundColor: '#0c1220',
     textOpacity: 1,
     fontWeight: 800,
     letterSpacing: -0.02,
-    bottomOffsetPx: 108,
+    bottomOffsetPx: 170,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 52,
     maxWidthPercent: 88,
@@ -152,14 +157,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   'soft-rose': {
     preset: 'soft-rose',
-    fontSize: 42,
+    fontSize: 48,
     textColor: '#881337',
     backgroundOpacity: 0.55,
     backgroundColor: '#fff1f2',
     textOpacity: 1,
     fontWeight: 600,
     letterSpacing: 0.01,
-    bottomOffsetPx: 128,
+    bottomOffsetPx: 190,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 64,
     maxWidthPercent: 80,
@@ -170,14 +175,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   'lyric-film': {
     preset: 'lyric-film',
-    fontSize: 54,
+    fontSize: 60,
     textColor: '#fafaf0',
     backgroundOpacity: 0.68,
     backgroundColor: '#0a0a0a',
     textOpacity: 1,
     fontWeight: 600,
     letterSpacing: 0.02,
-    bottomOffsetPx: 112,
+    bottomOffsetPx: 180,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 56,
     maxWidthPercent: 86,
@@ -188,14 +193,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   podcast: {
     preset: 'podcast',
-    fontSize: 44,
+    fontSize: 50,
     textColor: '#fafafa',
     backgroundOpacity: 0.62,
     backgroundColor: '#27272a',
     textOpacity: 1,
     fontWeight: 600,
     letterSpacing: 0,
-    bottomOffsetPx: 124,
+    bottomOffsetPx: 185,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 60,
     maxWidthPercent: 84,
@@ -206,14 +211,14 @@ const PRESET_VALUES: Record<SubtitleStylePreset, Partial<SubtitleStyle>> = {
   },
   hype: {
     preset: 'hype',
-    fontSize: 52,
+    fontSize: 58,
     textColor: '#ffffff',
     backgroundOpacity: 0.8,
     backgroundColor: '#6d28d9',
     textOpacity: 1,
     fontWeight: 900,
     letterSpacing: -0.03,
-    bottomOffsetPx: 102,
+    bottomOffsetPx: 165,
     horizontalOffsetPx: 0,
     horizontalPaddingPx: 48,
     maxWidthPercent: 90,
@@ -466,6 +471,61 @@ function PropertiesPanel({
                 className="h-9 border-zinc-800/60 bg-transparent font-mono text-sm text-zinc-200"
               />
             </div>
+
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Cue entrance</p>
+            <p className="mb-2 text-[11px] text-zinc-600">
+              How each subtitle line appears. Independent of background clip transitions.
+            </p>
+            <div className="mb-3 flex flex-col gap-1.5">
+              <Label className="text-[11px] text-zinc-600">Mode</Label>
+              <select
+                className="h-9 w-full rounded-md border border-zinc-800/60 bg-zinc-900/80 px-2 text-sm text-zinc-100"
+                value={subtitleStyle.subtitleEntrance ?? 'none'}
+                onChange={(e) => onSubtitleStyleChange({
+                  subtitleEntrance: e.target.value as SubtitleStyle['subtitleEntrance'],
+                })}
+              >
+                <option value="none">Instant</option>
+                <option value="fade">Quick fade</option>
+                <option value="spring">Spring</option>
+              </select>
+            </div>
+            {(subtitleStyle.subtitleEntrance ?? 'none') === 'fade' ? (
+              <div className="mb-3 flex flex-col gap-2 py-0.5">
+                <div className="flex justify-between text-[11px] text-zinc-600">
+                  <span>Fade duration (s)</span>
+                  <span className="font-mono text-zinc-400">
+                    {(subtitleStyle.entranceFadeDurationSec ?? 0.12).toFixed(2)}
+                  </span>
+                </div>
+                <Slider
+                  min={4}
+                  max={90}
+                  step={1}
+                  value={[Math.round((subtitleStyle.entranceFadeDurationSec ?? 0.12) * 100)]}
+                  onValueChange={([v]) => onSubtitleStyleChange({
+                    entranceFadeDurationSec: Math.max(0.04, Math.min(0.9, (v ?? 12) / 100)),
+                  })}
+                />
+              </div>
+            ) : null}
+            {(subtitleStyle.subtitleEntrance ?? 'none') === 'spring' ? (
+              <div className="mb-3 flex flex-col gap-2 py-0.5">
+                <div className="flex justify-between text-[11px] text-zinc-600">
+                  <span>Spring stiffness</span>
+                  <span className="font-mono text-zinc-400">{subtitleStyle.entranceSpringStiffness ?? 420}</span>
+                </div>
+                <Slider
+                  min={80}
+                  max={600}
+                  step={5}
+                  value={[subtitleStyle.entranceSpringStiffness ?? 420]}
+                  onValueChange={([v]) => onSubtitleStyleChange({
+                    entranceSpringStiffness: v ?? 420,
+                  })}
+                />
+              </div>
+            ) : null}
 
             <div className="mb-3 flex flex-col gap-1.5">
               <Label className="text-[11px] text-zinc-600">Text transform</Label>

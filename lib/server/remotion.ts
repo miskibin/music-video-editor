@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition, type RenderMediaProgress } from '@remotion/renderer';
-import { RENDER_COMPOSITION_ID, type RenderManifest } from '@/lib/render';
+import { RENDER_COMPOSITION_ID, type RenderManifest } from '../render';
 
 const getEntryPoint = () => path.join(process.cwd(), 'rendering', 'remotion', 'index.ts');
 let bundlePromise: Promise<string> | null = null;

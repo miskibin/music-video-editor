@@ -17,8 +17,8 @@ import {
   SubtitleStyle,
   Track,
   TransitionConfig,
-} from '@/lib/types';
-import { colorForBackgroundSegment } from '@/lib/visual-clip-colors';
+} from './types';
+import { colorForBackgroundSegment } from './visual-clip-colors';
 
 export const PROJECT_VERSION = 3 as const;
 export const ACTIVE_PROJECT_ID = 'active-project';
@@ -91,6 +91,9 @@ const subtitleStyleSchema = z.object({
   backdropBlurPx: z.number().min(0).max(40),
   textTransform: z.enum(['none', 'uppercase', 'lowercase']),
   wordHighlightMode: z.enum(['none', 'karaoke']),
+  subtitleEntrance: z.enum(['none', 'fade', 'spring']).default('none'),
+  entranceFadeDurationSec: z.number().min(0.04).max(0.9).default(0.12),
+  entranceSpringStiffness: z.number().min(80).max(600).default(420),
 });
 
 const assetRecordSchema = z.object({

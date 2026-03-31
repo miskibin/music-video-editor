@@ -28,6 +28,9 @@ export type SubtitleTextTransform = 'none' | 'uppercase' | 'lowercase';
 /** Highlight active word when word timings exist. */
 export type SubtitleWordHighlightMode = 'none' | 'karaoke';
 
+/** Per-cue appearance when a subtitle starts (independent of clip transitions). */
+export type SubtitleEntranceMode = 'none' | 'fade' | 'spring';
+
 export interface SubtitleStyle {
   preset: SubtitleStylePreset;
   fontSize: number;
@@ -49,19 +52,25 @@ export interface SubtitleStyle {
   backdropBlurPx: number;
   textTransform: SubtitleTextTransform;
   wordHighlightMode: SubtitleWordHighlightMode;
+  /** Instant, short fade, or springy pop-in. */
+  subtitleEntrance: SubtitleEntranceMode;
+  /** Linear fade length when `subtitleEntrance` is `fade`. */
+  entranceFadeDurationSec: number;
+  /** Spring stiffness when `subtitleEntrance` is `spring` (higher = snappier). */
+  entranceSpringStiffness: number;
 }
 
 /** Default “glass card” look (matches original hardcoded Remotion subtitle). */
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   preset: 'glass',
-  fontSize: 46,
+  fontSize: 52,
   textColor: '#ffffff',
   backgroundOpacity: 0.58,
   backgroundColor: '#000000',
   textOpacity: 1,
   fontWeight: 700,
   letterSpacing: -0.03,
-  bottomOffsetPx: 120,
+  bottomOffsetPx: 180,
   horizontalOffsetPx: 0,
   horizontalPaddingPx: 64,
   maxWidthPercent: 82,
@@ -69,6 +78,9 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   backdropBlurPx: 18,
   textTransform: 'none',
   wordHighlightMode: 'none',
+  subtitleEntrance: 'none',
+  entranceFadeDurationSec: 0.12,
+  entranceSpringStiffness: 420,
 };
 
 export type TransitionKind =

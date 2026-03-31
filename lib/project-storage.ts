@@ -1,5 +1,5 @@
 import { openDB, type DBSchema } from 'idb';
-import { EditorProject } from '@/lib/types';
+import { EditorProject } from './types';
 
 const DB_NAME = 'music-video-phase-2';
 const DB_VERSION = 1;

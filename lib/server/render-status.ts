@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { getRenderJobDir } from '@/lib/server/render-jobs';
+import { getRenderJobDir } from './render-jobs';
 
 type RenderJobState = 'queued' | 'staging' | 'bundling' | 'rendering' | 'completed' | 'error';
 

@@ -8,7 +8,7 @@ import {
   SubtitleStyle,
   SubtitleWord,
   TransitionConfig,
-} from '@/lib/types';
+} from './types';
 
 export const RENDER_COMPOSITION_ID = 'MusicVideo';
 export const RENDER_FPS = 30;

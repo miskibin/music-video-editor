@@ -1,4 +1,11 @@
-import { AbsoluteFill, Sequence, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import {
+  AbsoluteFill,
+  interpolate,
+  Sequence,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+} from 'remotion';
 import type { RenderSubtitleCue, RenderSubtitleWord } from '../../../lib/render';
 import type { SubtitleStyle } from '../../../lib/types';
 
@@ -35,15 +42,41 @@ const applyTextTransform = (text: string, mode: SubtitleStyle['textTransform']) 
 const SubtitleCard = ({ cue, style }: { cue: RenderSubtitleCue; style: SubtitleStyle }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const entrance = spring({
-    fps,
-    frame,
-    config: {
-      damping: 200,
-      mass: 0.9,
-      stiffness: 180,
-    },
-  });
+  const mode = style.subtitleEntrance ?? 'none';
+
+  const fadeFrames = Math.max(
+    1,
+    Math.round((style.entranceFadeDurationSec ?? 0.12) * fps),
+  );
+
+  let entrance = 1;
+  let translateYPx = 0;
+  let scale = 1;
+
+  if (mode === 'none') {
+    entrance = 1;
+    translateYPx = 0;
+    scale = 1;
+  } else if (mode === 'fade') {
+    entrance = interpolate(frame, [0, fadeFrames], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+    translateYPx = 0;
+    scale = 1;
+  } else {
+    entrance = spring({
+      fps,
+      frame,
+      config: {
+        stiffness: style.entranceSpringStiffness ?? 420,
+        damping: 26,
+        mass: 0.62,
+      },
+    });
+    translateYPx = 12 - entrance * 12;
+    scale = 0.98 + entrance * 0.02;
+  }
 
   const text = applyTextTransform(cue.text, style.textTransform);
   const bgRgba = (() => {
@@ -140,7 +173,7 @@ const SubtitleCard = ({ cue, style }: { cue: RenderSubtitleCue; style: SubtitleS
           backdropFilter: `blur(${style.backdropBlurPx}px)`,
           boxShadow: '0 18px 48px rgba(0, 0, 0, 0.35)',
           textShadow: captionShadowForPreset(style.preset),
-          transform: `translateY(${18 - entrance * 18}px) scale(${0.97 + entrance * 0.03})`,
+          transform: `translateY(${translateYPx}px) scale(${scale})`,
           opacity: entrance * style.textOpacity,
           ...(style.wordHighlightMode === 'karaoke' && cue.words.length > 0
             ? { overflow: 'visible' as const }
