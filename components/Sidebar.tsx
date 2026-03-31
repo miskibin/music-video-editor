@@ -1,27 +1,31 @@
 'use client';
 import React, { useRef } from 'react';
-import { Type, Image as ImageIcon, Sparkles, Music, Subtitles, MousePointer2 } from 'lucide-react';
-import { TrackType } from '@/lib/types';
+import { Film, Sparkles, Music, Subtitles, MousePointer2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
-  onAddClip: (type: TrackType) => void;
+  onAddSubtitleCue: () => void;
+  onAddBackgroundPlaceholder: () => void;
   onUploadMusic: (file: File) => void;
-  onUploadImage: (file: File) => void;
+  onUploadBackgroundMedia: (file: File) => void;
 }
 
-function Sidebar({ onAddClip, onUploadMusic, onUploadImage }: Props) {
+function Sidebar({
+  onAddSubtitleCue,
+  onAddBackgroundPlaceholder,
+  onUploadMusic,
+  onUploadBackgroundMedia,
+}: Props) {
   const musicInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
 
   const tools = [
-    { icon: MousePointer2, label: 'Select', type: null, action: 'select' as const },
-    { icon: Type, label: 'Text', type: 'text' as TrackType, action: 'add' as const },
-    { icon: ImageIcon, label: 'Image', type: 'video' as TrackType, action: 'upload-image' as const },
-    { icon: Sparkles, label: 'AI Art', type: 'video' as TrackType, action: 'add' as const },
-    { icon: Music, label: 'Music', type: 'audio' as TrackType, action: 'upload-audio' as const },
-    { icon: Subtitles, label: 'Subtitles', type: 'text' as TrackType, action: 'add' as const },
+    { icon: MousePointer2, label: 'Select', action: 'select' as const },
+    { icon: Film, label: 'Media', action: 'upload-background' as const },
+    { icon: Sparkles, label: 'AI Art', action: 'add-background' as const },
+    { icon: Music, label: 'Music', action: 'upload-audio' as const },
+    { icon: Subtitles, label: 'Cue', action: 'add-subtitle' as const },
   ];
 
   const handleToolClick = (tool: typeof tools[number]) => {
@@ -30,13 +34,18 @@ function Sidebar({ onAddClip, onUploadMusic, onUploadImage }: Props) {
       return;
     }
 
-    if (tool.action === 'upload-image') {
-      imageInputRef.current?.click();
+    if (tool.action === 'upload-background') {
+      backgroundInputRef.current?.click();
       return;
     }
 
-    if (tool.type) {
-      onAddClip(tool.type);
+    if (tool.action === 'add-background') {
+      onAddBackgroundPlaceholder();
+      return;
+    }
+
+    if (tool.action === 'add-subtitle') {
+      onAddSubtitleCue();
     }
   };
 
@@ -47,10 +56,10 @@ function Sidebar({ onAddClip, onUploadMusic, onUploadImage }: Props) {
     event.target.value = '';
   };
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackgroundChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    onUploadImage(file);
+    onUploadBackgroundMedia(file);
     event.target.value = '';
   };
 
@@ -64,22 +73,22 @@ function Sidebar({ onAddClip, onUploadMusic, onUploadImage }: Props) {
         onChange={handleMusicChange}
       />
       <input
-        ref={imageInputRef}
+        ref={backgroundInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         className="hidden"
-        onChange={handleImageChange}
+        onChange={handleBackgroundChange}
       />
 
       {tools.map((tool, i) => (
         <Tooltip key={i}>
           <TooltipTrigger asChild>
             <Button
-              variant={!tool.type ? "secondary" : "ghost"}
+              variant={tool.action === 'select' ? 'secondary' : 'ghost'}
               size="icon"
               onClick={() => handleToolClick(tool)}
               className={`h-14 w-14 rounded-xl flex flex-col items-center justify-center gap-1 ${
-                !tool.type 
+                tool.action === 'select'
                   ? 'bg-zinc-800 text-white hover:bg-zinc-700' 
                   : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
               }`}
@@ -92,11 +101,13 @@ function Sidebar({ onAddClip, onUploadMusic, onUploadImage }: Props) {
             <p>
               {tool.action === 'upload-audio'
                 ? 'Upload music'
-                : tool.action === 'upload-image'
-                  ? 'Upload image'
-                  : tool.type
-                    ? `Add ${tool.label}`
-                    : tool.label}
+                : tool.action === 'upload-background'
+                  ? 'Upload background image or video'
+                  : tool.action === 'add-background'
+                    ? 'Add AI background placeholder'
+                    : tool.action === 'add-subtitle'
+                      ? 'Add subtitle cue'
+                      : tool.label}
             </p>
           </TooltipContent>
         </Tooltip>

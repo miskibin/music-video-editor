@@ -163,7 +163,7 @@ function PropertiesPanel({ clip, onChange }: Props) {
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Source</p>
-                <p className="mt-1 text-zinc-300">{clip.assetUrl ? 'Uploaded' : 'Sample'}</p>
+                <p className="mt-1 text-zinc-300">{clip.assetId ? 'Uploaded' : 'Sample'}</p>
               </div>
               <div className="rounded-lg border border-zinc-800/70 bg-zinc-950/80 px-3 py-2">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-600">Style</p>

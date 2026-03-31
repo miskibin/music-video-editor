@@ -5,129 +5,53 @@ import Sidebar from '@/components/Sidebar';
 import VideoPreview from '@/components/VideoPreview';
 import Timeline from '@/components/Timeline';
 import PropertiesPanel from '@/components/PropertiesPanel';
-import { Clip, Track, TrackType } from '@/lib/types';
+import { AssetRecord, BackgroundSegment, Clip, MusicClip, SubtitleCue } from '@/lib/types';
+import {
+  ACTIVE_PROJECT_ID,
+  MIN_CLIP_DURATION,
+  TIMELINE_TRACKS,
+  appendSubtitleCue,
+  buildTimelineClips,
+  createDefaultBackgroundSegment,
+  createDefaultProject,
+  createId,
+  deleteTimelineClipFromProject,
+  getReferencedAssetIds,
+  normalizeTrackAfterDrag,
+  parseProjectDocument,
+  replaceMusicClip,
+  sanitizeProjectAgainstMissingAssets,
+  updateTimelineClipInProject,
+  upsertBackgroundSegment,
+} from '@/lib/project';
+import {
+  deletePersistedAssets,
+  loadPersistedAssetBlobs,
+  loadPersistedProject,
+  persistAssetBlob,
+  persistProject,
+} from '@/lib/project-storage';
+import {
+  extractWaveformPeaks,
+  getAudioDuration,
+  getImageMetadata,
+  getVideoMetadata,
+  waitForAudioMetadata,
+  waitForAudioReady,
+} from '@/lib/media-utils';
+
+type AssetBlobMap = Record<string, Blob>;
+type SaveState = 'loading' | 'saving' | 'saved' | 'error';
 
 const AUDIO_TRACK_ID = 'a1';
 const VIDEO_TRACK_ID = 'v1';
 const TEXT_TRACK_ID = 't1';
-const WAVEFORM_BARS = 320;
-const MIN_CLIP_DURATION = 1;
+const TIMELINE_CHROME_HEIGHT = 64;
+const TIMELINE_TRACK_HEIGHT = 48;
+const TIMELINE_BOTTOM_PADDING = 4;
+const TIMELINE_HEIGHT = TIMELINE_CHROME_HEIGHT + (TIMELINE_TRACKS.length * TIMELINE_TRACK_HEIGHT) + TIMELINE_BOTTOM_PADDING;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
-const createClipId = () => Math.random().toString(36).substring(2, 9);
-
-const getAudioDuration = (url: string) => new Promise<number>((resolve) => {
-  const probe = document.createElement('audio');
-
-  const cleanup = () => {
-    probe.removeAttribute('src');
-    probe.load();
-  };
-
-  probe.preload = 'metadata';
-  probe.src = url;
-
-  probe.onloadedmetadata = () => {
-    const duration = Number.isFinite(probe.duration) ? probe.duration : 30;
-    cleanup();
-    resolve(duration);
-  };
-
-  probe.onerror = () => {
-    cleanup();
-    resolve(30);
-  };
-});
-
-const getAudioContextConstructor = () => {
-  const windowWithWebkit = window as Window & typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
-  return window.AudioContext ?? windowWithWebkit.webkitAudioContext;
-};
-
-const extractWaveformPeaks = async (url: string, totalBars = WAVEFORM_BARS) => {
-  const AudioContextConstructor = getAudioContextConstructor();
-  if (!AudioContextConstructor) {
-    return [];
-  }
-
-  const audioContext = new AudioContextConstructor();
-
-  try {
-    const response = await fetch(url);
-    const audioData = await response.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(audioData);
-    const samplesPerBar = Math.max(1, Math.floor(audioBuffer.length / totalBars));
-
-    const peaks = Array.from({ length: totalBars }, (_, barIndex) => {
-      const start = barIndex * samplesPerBar;
-      const end = Math.min(audioBuffer.length, start + samplesPerBar);
-      const sampleStep = Math.max(1, Math.floor((end - start) / 96));
-      let peak = 0;
-
-      for (let channelIndex = 0; channelIndex < audioBuffer.numberOfChannels; channelIndex += 1) {
-        const channelData = audioBuffer.getChannelData(channelIndex);
-
-        for (let sampleIndex = start; sampleIndex < end; sampleIndex += sampleStep) {
-          peak = Math.max(peak, Math.abs(channelData[sampleIndex] ?? 0));
-        }
-      }
-
-      return peak;
-    });
-
-    const maxPeak = Math.max(...peaks, 0.001);
-    return peaks.map((peak) => Number((peak / maxPeak).toFixed(4)));
-  } catch {
-    return [];
-  } finally {
-    await audioContext.close().catch(() => undefined);
-  }
-};
-
-const waitForAudioMetadata = (audio: HTMLAudioElement) => new Promise<void>((resolve) => {
-  if (audio.readyState >= 1) {
-    resolve();
-    return;
-  }
-
-  const handleLoadedMetadata = () => {
-    resolve();
-  };
-
-  const handleError = () => {
-    resolve();
-  };
-
-  audio.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
-  audio.addEventListener('error', handleError, { once: true });
-});
-
-const waitForAudioReady = (audio: HTMLAudioElement) => new Promise<void>((resolve) => {
-  if (audio.readyState >= 2) {
-    resolve();
-    return;
-  }
-
-  const handleLoadedData = () => {
-    resolve();
-  };
-
-  const handleCanPlay = () => {
-    resolve();
-  };
-
-  const handleError = () => {
-    resolve();
-  };
-
-  audio.addEventListener('loadeddata', handleLoadedData, { once: true });
-  audio.addEventListener('canplay', handleCanPlay, { once: true });
-  audio.addEventListener('error', handleError, { once: true });
-});
 
 const sortClipsByStart = (clips: Clip[]) => [...clips].sort((left, right) => left.start - right.start);
 
@@ -137,173 +61,122 @@ const getClipTrimStart = (clip: Clip) => clip.trimStart ?? 0;
 
 const getClipTrimEnd = (clip: Clip) => Math.min(getClipTrimStart(clip) + clip.duration, getClipSourceDuration(clip));
 
-const normalizeClipUpdates = (clip: Clip, updates: Partial<Clip>) => {
-  if (clip.trackId !== AUDIO_TRACK_ID || !clip.assetUrl) {
-    return updates;
-  }
-
-  const sourceDuration = Math.max(getClipSourceDuration(clip), MIN_CLIP_DURATION);
-  const trimStart = clamp(
-    updates.trimStart ?? getClipTrimStart(clip),
-    0,
-    Math.max(sourceDuration - MIN_CLIP_DURATION, 0),
-  );
-  const duration = clamp(
-    updates.duration ?? clip.duration,
-    MIN_CLIP_DURATION,
-    Math.max(sourceDuration - trimStart, MIN_CLIP_DURATION),
-  );
-
-  return {
-    ...updates,
-    sourceDuration,
-    trimStart,
-    duration,
-  };
-};
-
 const findClipAtTime = (clips: Clip[], time: number) => clips.find(
   (clip) => time >= clip.start && time < clip.start + clip.duration,
 ) ?? null;
 
-const mergeClipUpdates = (clip: Clip, updates: Partial<Clip>) => {
-  let didChange = false;
-  const nextClip = { ...clip };
+const getTrackMaxEnd = <T extends { start: number; duration: number }>(items: T[]) => items.reduce(
+  (max, item) => Math.max(max, item.start + item.duration),
+  0,
+);
 
-  for (const [key, value] of Object.entries(updates) as [keyof Clip, Clip[keyof Clip]][]) {
-    if (Object.is(clip[key], value)) {
-      continue;
-    }
+const nowIso = () => new Date().toISOString();
 
-    Object.assign(nextClip, { [key]: value });
-    didChange = true;
-  }
+const createUploadedAssetRecord = (
+  assetId: string,
+  file: File,
+  overrides: Partial<AssetRecord>,
+): AssetRecord => {
+  const timestamp = nowIso();
 
-  return didChange ? nextClip : clip;
+  return {
+    id: assetId,
+    kind: overrides.kind ?? 'image',
+    name: file.name,
+    mimeType: file.type || 'application/octet-stream',
+    size: file.size,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    source: 'upload',
+    ...overrides,
+  };
 };
-
-const updateClipCollection = (clips: Clip[], id: string, updates: Partial<Clip>) => {
-  let didChange = false;
-
-  const nextClips = clips.map((clip) => {
-    if (clip.id !== id) {
-      return clip;
-    }
-
-    const nextClip = mergeClipUpdates(clip, updates);
-    if (nextClip !== clip) {
-      didChange = true;
-    }
-
-    return nextClip;
-  });
-
-  return didChange ? nextClips : clips;
-};
-
-const INITIAL_TRACKS: Track[] = [
-  { id: 'v1', name: 'V1 - Main', type: 'video' },
-  { id: 't1', name: 'T1 - Text', type: 'text' },
-  { id: 'a1', name: 'A1 - Audio', type: 'audio' },
-];
-
-const TIMELINE_CHROME_HEIGHT = 64;
-const TIMELINE_TRACK_HEIGHT = 48;
-const TIMELINE_BOTTOM_PADDING = 4;
-const TIMELINE_HEIGHT = TIMELINE_CHROME_HEIGHT + (INITIAL_TRACKS.length * TIMELINE_TRACK_HEIGHT) + TIMELINE_BOTTOM_PADDING;
-
-const INITIAL_CLIPS: Clip[] = [
-  { id: 'c1', trackId: 'v1', name: 'Intro.mp4', color: '#2563eb', start: 0, duration: 15, visualType: 'gradient' },
-  { id: 'c2', trackId: 'v1', name: 'Main_Sequence.mp4', color: '#2563eb', start: 15, duration: 30, visualType: 'gradient' },
-  { id: 'c3', trackId: 'v1', name: 'B-Roll_01.mp4', color: '#3b82f6', start: 45, duration: 10, visualType: 'gradient' },
-  { id: 'c4', trackId: 't1', name: 'Title Text', color: '#d946ef', start: 5, duration: 10, overlayText: 'Your subtitles here' },
-];
 
 export default function Editor() {
-  const [clips, setClips] = useState<Clip[]>(INITIAL_CLIPS);
+  const [project, setProject] = useState(createDefaultProject);
+  const [assetBlobs, setAssetBlobs] = useState<AssetBlobMap>({});
+  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [activeAudioClipId, setActiveAudioClipId] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>('loading');
+  const [hasHydratedProject, setHasHydratedProject] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const objectUrlsRef = useRef<string[]>([]);
+  const objectUrlsRef = useRef<Record<string, string>>({});
+  const previousBlobMapRef = useRef<AssetBlobMap>({});
+  const projectRef = useRef(project);
+  const assetBlobsRef = useRef(assetBlobs);
+  const persistedAssetIdsRef = useRef<Set<string>>(new Set());
+  const autoSaveInitializedRef = useRef(false);
 
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+
+  useEffect(() => {
+    assetBlobsRef.current = assetBlobs;
+  }, [assetBlobs]);
+
+  const timelineClips = useMemo(
+    () => buildTimelineClips(project, assetUrls),
+    [assetUrls, project],
+  );
   const selectedClip = useMemo(
-    () => clips.find((clip) => clip.id === selectedClipId) || null,
-    [clips, selectedClipId],
+    () => timelineClips.find((clip) => clip.id === selectedClipId) || null,
+    [selectedClipId, timelineClips],
   );
-  const audioClips = useMemo(
-    () => clips.filter((clip) => clip.trackId === AUDIO_TRACK_ID),
-    [clips],
-  );
-  const uploadedAudioClips = useMemo(
-    () => audioClips.filter((clip) => Boolean(clip.assetUrl)),
-    [audioClips],
+  const musicClip = useMemo(
+    () => timelineClips.find((clip) => clip.trackId === AUDIO_TRACK_ID) || null,
+    [timelineClips],
   );
   const sortedVisualClips = useMemo(
-    () => sortClipsByStart(clips.filter((clip) => clip.trackId === VIDEO_TRACK_ID)),
-    [clips],
+    () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === VIDEO_TRACK_ID)),
+    [timelineClips],
   );
   const sortedTextClips = useMemo(
-    () => sortClipsByStart(clips.filter((clip) => clip.trackId === TEXT_TRACK_ID)),
-    [clips],
-  );
-  const selectedAudioClip = useMemo(
-    () => selectedClip?.trackId === AUDIO_TRACK_ID && selectedClip.assetUrl ? selectedClip : null,
-    [selectedClip],
-  );
-  const latestUploadedAudioClip = uploadedAudioClips[uploadedAudioClips.length - 1] || null;
-  const latestUploadedVisualClip = useMemo(
-    () => [...clips].reverse().find((clip) => clip.trackId === VIDEO_TRACK_ID && clip.assetUrl) || null,
-    [clips],
-  );
-  const firstVisualClip = useMemo(
-    () => clips.find((clip) => clip.trackId === VIDEO_TRACK_ID) || null,
-    [clips],
-  );
-  const firstTextClip = useMemo(
-    () => clips.find((clip) => clip.trackId === TEXT_TRACK_ID) || null,
-    [clips],
-  );
-  const activeAudioClip = useMemo(
-    () => selectedAudioClip
-      || uploadedAudioClips.find((clip) => clip.id === activeAudioClipId)
-      || latestUploadedAudioClip,
-    [activeAudioClipId, latestUploadedAudioClip, selectedAudioClip, uploadedAudioClips],
+    () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === TEXT_TRACK_ID)),
+    [timelineClips],
   );
   const activeVisualClip = useMemo(
-    () => findClipAtTime(sortedVisualClips, currentTime)
-      || latestUploadedVisualClip
-      || firstVisualClip,
-    [currentTime, firstVisualClip, latestUploadedVisualClip, sortedVisualClips],
+    () => findClipAtTime(sortedVisualClips, currentTime) || sortedVisualClips[0] || null,
+    [currentTime, sortedVisualClips],
   );
   const activeTextClip = useMemo(
-    () => findClipAtTime(sortedTextClips, currentTime)
-      || firstTextClip,
-    [currentTime, firstTextClip, sortedTextClips],
+    () => findClipAtTime(sortedTextClips, currentTime) || sortedTextClips[0] || null,
+    [currentTime, sortedTextClips],
   );
   const subtitleText = useMemo(
-    () => activeTextClip?.overlayText || activeTextClip?.name || 'Your subtitles here',
-    [activeTextClip],
+    () => activeTextClip?.overlayText || project.subtitles.sourceText || 'Your subtitles here',
+    [activeTextClip, project.subtitles.sourceText],
   );
 
-  const revokeObjectUrl = useCallback((url?: string) => {
-    if (!url) return;
-    objectUrlsRef.current = objectUrlsRef.current.filter(currentUrl => currentUrl !== url);
-    URL.revokeObjectURL(url);
-  }, []);
+  const persistNow = useCallback(async (nextProject: typeof project, nextAssetBlobs: AssetBlobMap) => {
+    try {
+      setSaveState('saving');
 
-  const registerObjectUrl = useCallback((file: File) => {
-    const url = URL.createObjectURL(file);
-    objectUrlsRef.current.push(url);
-    return url;
+      const referencedAssetIds = getReferencedAssetIds(nextProject);
+      const nextBlobAssetIds = Object.keys(nextAssetBlobs).filter((assetId) => referencedAssetIds.has(assetId));
+
+      await persistProject(nextProject);
+      await Promise.all(nextBlobAssetIds.map((assetId) => persistAssetBlob(assetId, nextAssetBlobs[assetId])));
+
+      const removedAssetIds = [...persistedAssetIdsRef.current].filter((assetId) => !nextBlobAssetIds.includes(assetId));
+      await deletePersistedAssets(removedAssetIds);
+
+      persistedAssetIdsRef.current = new Set(nextBlobAssetIds);
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
   }, []);
 
   const syncAudioTime = useCallback(async (time: number) => {
     const audio = audioRef.current;
-    const clip = activeAudioClip;
-    if (!audio || !clip?.assetUrl) return;
+    const clip = musicClip;
+    if (!audio || !clip?.assetUrl) {
+      return;
+    }
 
     const nextOffset = clamp(time - clip.start, 0, Math.max(clip.duration - 0.05, 0));
     if (audio.src !== clip.assetUrl) {
@@ -317,7 +190,7 @@ export default function Editor() {
       getClipTrimStart(clip) + nextOffset,
       Math.max(audio.duration - 0.05, 0),
     );
-  }, [activeAudioClip]);
+  }, [musicClip]);
 
   const stopPlayback = useCallback((resetToStart = true) => {
     const audio = audioRef.current;
@@ -328,7 +201,9 @@ export default function Editor() {
 
     if (audio) {
       audio.pause();
-      audio.currentTime = 0;
+      if (resetToStart) {
+        audio.currentTime = 0;
+      }
     }
 
     setIsPlaying(false);
@@ -337,131 +212,177 @@ export default function Editor() {
     }
   }, []);
 
-  const handleAddClip = useCallback((type: TrackType) => {
-    const track = INITIAL_TRACKS.find(t => t.type === type);
-    if (!track) return;
+  const handleSave = useCallback(() => {
+    void persistNow(projectRef.current, assetBlobsRef.current);
+  }, [persistNow]);
 
-    const newClip: Clip = {
-      id: createClipId(),
-      trackId: track.id,
-      name: `New ${type}`,
-      color: type === 'video' ? '#3b82f6' : type === 'text' ? '#d946ef' : '#22c55e',
-      start: 0,
-      duration: 10,
-      visualType: type === 'video' ? 'gradient' : undefined,
-      overlayText: type === 'text' ? 'Your subtitles here' : undefined,
+  const handleAddSubtitleCue = useCallback(() => {
+    const subtitleCue: SubtitleCue = {
+      id: createId(),
+      start: getTrackMaxEnd(projectRef.current.subtitles.cues),
+      duration: 6,
+      text: 'New subtitle',
+      words: [],
     };
 
-    setClips((currentClips) => {
-      const trackClips = currentClips.filter((clip) => clip.trackId === track.id);
-      const maxEnd = trackClips.reduce((max, clip) => Math.max(max, clip.start + clip.duration), 0);
-      return [...currentClips, { ...newClip, start: maxEnd }];
-    });
-    setSelectedClipId(newClip.id);
+    setProject((currentProject) => appendSubtitleCue(currentProject, subtitleCue));
+    setSelectedClipId(subtitleCue.id);
+  }, []);
+
+  const handleAddBackgroundPlaceholder = useCallback(() => {
+    const currentProject = projectRef.current;
+    const hasSinglePlaceholder = currentProject.background.segments.length === 1
+      && !currentProject.background.segments[0]?.assetId
+      && currentProject.background.segments[0]?.visualType === 'gradient';
+
+    if (hasSinglePlaceholder) {
+      setSelectedClipId(currentProject.background.segments[0].id);
+      return;
+    }
+
+    const segment: BackgroundSegment = {
+      ...createDefaultBackgroundSegment(),
+      name: `AI Background ${currentProject.background.segments.length + 1}`,
+      start: getTrackMaxEnd(currentProject.background.segments),
+    };
+
+    setProject((nextProject) => upsertBackgroundSegment(nextProject, segment));
+    setSelectedClipId(segment.id);
   }, []);
 
   const handleUploadMusic = useCallback(async (file: File) => {
-    const assetUrl = registerObjectUrl(file);
-    const [duration, waveform] = await Promise.all([
-      getAudioDuration(assetUrl),
-      extractWaveformPeaks(assetUrl),
-    ]);
+    const previousMusicAssetId = projectRef.current.music.clip?.assetId ?? null;
+    const temporaryUrl = URL.createObjectURL(file);
 
-    clips
-      .filter(clip => clip.trackId === AUDIO_TRACK_ID && clip.assetUrl)
-      .forEach(clip => revokeObjectUrl(clip.assetUrl));
+    try {
+      const [duration, waveform] = await Promise.all([
+        getAudioDuration(temporaryUrl),
+        extractWaveformPeaks(temporaryUrl),
+      ]);
+      const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
+      const assetId = createId();
+      const clipId = createId();
+      const asset = createUploadedAssetRecord(assetId, file, {
+        kind: 'audio',
+        mimeType: file.type || 'audio/mpeg',
+        duration: safeDuration,
+      });
+      const clip: MusicClip = {
+        id: clipId,
+        assetId,
+        name: file.name,
+        color: '#22c55e',
+        start: 0,
+        duration: safeDuration,
+        sourceDuration: safeDuration,
+        trimStart: 0,
+        waveform,
+      };
 
-    stopPlayback();
+      stopPlayback();
+      setProject((currentProject) => replaceMusicClip(currentProject, clip, asset));
+      setAssetBlobs((currentBlobs) => {
+        const nextBlobs = {
+          ...currentBlobs,
+          [assetId]: file,
+        };
 
-    const newClip: Clip = {
-      id: createClipId(),
-      trackId: AUDIO_TRACK_ID,
-      name: file.name,
-      color: '#22c55e',
-      start: 0,
-      duration,
-      sourceDuration: duration,
-      trimStart: 0,
-      assetUrl,
-      waveform,
-    };
+        if (previousMusicAssetId) {
+          delete nextBlobs[previousMusicAssetId];
+        }
 
-    setClips(currentClips => [
-      ...currentClips.filter(clip => clip.trackId !== AUDIO_TRACK_ID),
-      newClip,
-    ]);
-    setActiveAudioClipId(newClip.id);
-    setSelectedClipId(newClip.id);
-    setCurrentTime(0);
-  }, [clips, registerObjectUrl, revokeObjectUrl, stopPlayback]);
+        return nextBlobs;
+      });
+      setSelectedClipId(clipId);
+      setCurrentTime(0);
+    } finally {
+      URL.revokeObjectURL(temporaryUrl);
+    }
+  }, [stopPlayback]);
 
-  const handleUploadImage = useCallback((file: File) => {
-    const assetUrl = registerObjectUrl(file);
-    const newClip: Clip = {
-      id: createClipId(),
-      trackId: VIDEO_TRACK_ID,
-      name: file.name,
-      color: '#fb7185',
-      start: currentTime,
-      duration: activeAudioClip?.duration || 12,
-      assetUrl,
-      visualType: 'image',
-    };
+  const handleUploadBackgroundMedia = useCallback(async (file: File) => {
+    const isVideo = file.type.startsWith('video/');
+    const temporaryUrl = URL.createObjectURL(file);
 
-    setClips(currentClips => [...currentClips, newClip]);
-    setSelectedClipId(newClip.id);
-  }, [activeAudioClip?.duration, currentTime, registerObjectUrl]);
+    try {
+      const metadata = isVideo
+        ? await getVideoMetadata(temporaryUrl)
+        : await getImageMetadata(temporaryUrl);
+      const currentProject = projectRef.current;
+      const hasSinglePlaceholder = currentProject.background.segments.length === 1
+        && !currentProject.background.segments[0]?.assetId
+        && currentProject.background.segments[0]?.visualType === 'gradient';
+      const assetId = createId();
+      const segmentId = createId();
+      const safeSourceDuration = isVideo && 'duration' in metadata
+        ? Math.max(metadata.duration, MIN_CLIP_DURATION)
+        : undefined;
+      const segment: BackgroundSegment = {
+        id: segmentId,
+        assetId,
+        name: file.name,
+        color: isVideo ? '#38bdf8' : '#fb7185',
+        start: hasSinglePlaceholder ? 0 : getTrackMaxEnd(currentProject.background.segments),
+        duration: isVideo
+          ? safeSourceDuration ?? 12
+          : Math.max(currentProject.music.clip?.duration ?? currentProject.background.segments[0]?.duration ?? 12, MIN_CLIP_DURATION),
+        sourceDuration: safeSourceDuration,
+        trimStart: isVideo ? 0 : undefined,
+        visualType: isVideo ? 'video' : 'image',
+        transition: { kind: 'none', duration: 0 },
+        motion: { mode: 'beat-pulse', strength: 0.2 },
+      };
+      const asset = createUploadedAssetRecord(assetId, file, {
+        kind: isVideo ? 'video' : 'image',
+        mimeType: file.type || (isVideo ? 'video/mp4' : 'image/jpeg'),
+        duration: safeSourceDuration,
+        width: metadata.width,
+        height: metadata.height,
+      });
+
+      setProject((nextProject) => upsertBackgroundSegment(nextProject, segment, asset, { replacePlaceholder: hasSinglePlaceholder }));
+      setAssetBlobs((currentBlobs) => ({
+        ...currentBlobs,
+        [assetId]: file,
+      }));
+      setSelectedClipId(segmentId);
+    } finally {
+      URL.revokeObjectURL(temporaryUrl);
+    }
+  }, []);
 
   const handleUpdateClip = useCallback((id: string, updates: Partial<Clip>) => {
-    setClips((currentClips) => {
-      const clip = currentClips.find((currentClip) => currentClip.id === id);
-      if (!clip) {
-        return currentClips;
-      }
-
-      return updateClipCollection(currentClips, id, normalizeClipUpdates(clip, updates));
-    });
+    setProject((currentProject) => updateTimelineClipInProject(currentProject, id, updates));
   }, []);
 
   const handleDragEnd = useCallback((clipId: string) => {
-    setClips(currentClips => {
-      const clip = currentClips.find(c => c.id === clipId);
-      if (!clip) return currentClips;
-
-      let updatedClips = [...currentClips];
-
-      const trackClips = updatedClips
-        .filter(c => c.trackId === clip.trackId)
-        .sort((a, b) => a.start - b.start);
-      
-      let currentStart = 0;
-      trackClips.forEach(c => {
-        const newStart = Math.max(currentStart, c.start);
-        if (newStart !== c.start) {
-          const index = updatedClips.findIndex(uc => uc.id === c.id);
-          updatedClips[index] = { ...updatedClips[index], start: newStart };
-        }
-        currentStart = newStart + c.duration;
-      });
-
-      return updatedClips;
-    });
+    setProject((currentProject) => normalizeTrackAfterDrag(currentProject, clipId));
   }, []);
 
   const handleDeleteClip = useCallback((id: string) => {
-    const clipToDelete = clips.find(c => c.id === id);
-    if (clipToDelete?.assetUrl) {
-      revokeObjectUrl(clipToDelete.assetUrl);
+    const clipToDelete = timelineClips.find((clip) => clip.id === id);
+    if (!clipToDelete) {
+      return;
     }
 
-    if (id === activeAudioClipId || clipToDelete?.trackId === AUDIO_TRACK_ID) {
+    if (clipToDelete.trackId === AUDIO_TRACK_ID) {
       stopPlayback();
-      setActiveAudioClipId(null);
+      setCurrentTime(0);
     }
 
-    setClips(clips.filter(c => c.id !== id));
-    if (selectedClipId === id) setSelectedClipId(null);
-  }, [activeAudioClipId, clips, revokeObjectUrl, selectedClipId, stopPlayback]);
+    setProject((currentProject) => deleteTimelineClipFromProject(currentProject, id));
+    if (clipToDelete.assetId) {
+      setAssetBlobs((currentBlobs) => {
+        const nextBlobs = { ...currentBlobs };
+        delete nextBlobs[clipToDelete.assetId!];
+        return nextBlobs;
+      });
+    }
+
+    if (selectedClipId === id) {
+      setSelectedClipId(null);
+    }
+  }, [selectedClipId, stopPlayback, timelineClips]);
 
   const handleTimeChange = useCallback((time: number) => {
     const nextTime = Math.max(0, time);
@@ -471,7 +392,7 @@ export default function Editor() {
 
   const handlePlay = useCallback(async () => {
     const audio = audioRef.current;
-    const clip = activeAudioClip;
+    const clip = musicClip;
 
     if (!audio || !clip?.assetUrl) {
       setIsPlaying(false);
@@ -499,29 +420,26 @@ export default function Editor() {
       audio.volume = 1;
       await audio.play();
       setIsPlaying(true);
-      setActiveAudioClipId(clip.id);
     } catch {
       setIsPlaying(false);
     }
-  }, [activeAudioClip, currentTime]);
+  }, [currentTime, musicClip]);
 
   const handlePause = useCallback(() => {
     const audio = audioRef.current;
-    if (audio && activeAudioClip) {
+    if (audio && musicClip) {
       audio.pause();
       setCurrentTime(
-        activeAudioClip.start
-          + clamp(audio.currentTime - getClipTrimStart(activeAudioClip), 0, activeAudioClip.duration),
+        musicClip.start + clamp(audio.currentTime - getClipTrimStart(musicClip), 0, musicClip.duration),
       );
     }
     setIsPlaying(false);
-  }, [activeAudioClip]);
+  }, [musicClip]);
 
   const handleStepTime = useCallback((delta: number) => {
-    const clip = activeAudioClip;
-    const clipEnd = clip ? clip.start + clip.duration : Number.POSITIVE_INFINITY;
+    const clipEnd = musicClip ? musicClip.start + musicClip.duration : Number.POSITIVE_INFINITY;
     handleTimeChange(clamp(currentTime + delta, 0, clipEnd));
-  }, [activeAudioClip, currentTime, handleTimeChange]);
+  }, [currentTime, handleTimeChange, musicClip]);
 
   useEffect(() => {
     audioRef.current = new Audio();
@@ -540,36 +458,112 @@ export default function Editor() {
         audioRef.current.load();
       }
 
-      objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      objectUrlsRef.current = [];
+      Object.values(objectUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current = {};
     };
   }, []);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    let cancelled = false;
 
-    if (!activeAudioClip?.assetUrl) {
+    const hydrateProject = async () => {
+      try {
+        const storedProject = await loadPersistedProject(ACTIVE_PROJECT_ID);
+        const parsedProject = parseProjectDocument(storedProject ?? createDefaultProject());
+        const storedAssetBlobs = await loadPersistedAssetBlobs(Array.from(getReferencedAssetIds(parsedProject)));
+        const sanitizedProject = sanitizeProjectAgainstMissingAssets(
+          parsedProject,
+          new Set(Object.keys(storedAssetBlobs)),
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        persistedAssetIdsRef.current = new Set(Object.keys(storedAssetBlobs));
+        setProject(sanitizedProject);
+        setAssetBlobs(storedAssetBlobs);
+        setSaveState('saved');
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        persistedAssetIdsRef.current = new Set();
+        setProject(createDefaultProject());
+        setAssetBlobs({});
+        setSaveState('error');
+      } finally {
+        if (!cancelled) {
+          setHasHydratedProject(true);
+        }
+      }
+    };
+
+    void hydrateProject();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const nextAssetUrls: Record<string, string> = {};
+
+    Object.entries(assetBlobs).forEach(([assetId, blob]) => {
+      if (previousBlobMapRef.current[assetId] === blob && objectUrlsRef.current[assetId]) {
+        nextAssetUrls[assetId] = objectUrlsRef.current[assetId];
+        return;
+      }
+
+      nextAssetUrls[assetId] = URL.createObjectURL(blob);
+    });
+
+    Object.entries(objectUrlsRef.current).forEach(([assetId, url]) => {
+      if (!nextAssetUrls[assetId] || nextAssetUrls[assetId] !== url) {
+        URL.revokeObjectURL(url);
+      }
+    });
+
+    objectUrlsRef.current = nextAssetUrls;
+    previousBlobMapRef.current = assetBlobs;
+    setAssetUrls(nextAssetUrls);
+  }, [assetBlobs]);
+
+  useEffect(() => {
+    if (selectedClipId && !timelineClips.some((clip) => clip.id === selectedClipId)) {
+      setSelectedClipId(null);
+    }
+  }, [selectedClipId, timelineClips]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+
+    if (!musicClip?.assetUrl) {
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
       return;
     }
 
-    if (audio.src !== activeAudioClip.assetUrl) {
-      audio.src = activeAudioClip.assetUrl;
+    if (audio.src !== musicClip.assetUrl) {
+      audio.src = musicClip.assetUrl;
       audio.load();
     }
-  }, [activeAudioClip]);
+  }, [musicClip]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    const clip = activeAudioClip;
-    if (!audio || !clip) return;
+    if (!audio || !musicClip) {
+      return;
+    }
 
     const handleEnded = () => {
       setIsPlaying(false);
-      setCurrentTime(clip.start + clip.duration);
+      setCurrentTime(musicClip.start + musicClip.duration);
     };
 
     audio.addEventListener('ended', handleEnded);
@@ -577,10 +571,10 @@ export default function Editor() {
     return () => {
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [activeAudioClip]);
+  }, [musicClip]);
 
   useEffect(() => {
-    if (!isPlaying || !activeAudioClip) {
+    if (!isPlaying || !musicClip) {
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -589,23 +583,25 @@ export default function Editor() {
     }
 
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     const tick = () => {
-      const trimStart = getClipTrimStart(activeAudioClip);
-      const trimEnd = getClipTrimEnd(activeAudioClip);
-      const clipTime = clamp(audio.currentTime - trimStart, 0, activeAudioClip.duration);
+      const trimStart = getClipTrimStart(musicClip);
+      const trimEnd = getClipTrimEnd(musicClip);
+      const clipTime = clamp(audio.currentTime - trimStart, 0, musicClip.duration);
 
-      if (audio.currentTime >= trimEnd - 0.02 || clipTime >= activeAudioClip.duration - 0.02) {
+      if (audio.currentTime >= trimEnd - 0.02 || clipTime >= musicClip.duration - 0.02) {
         audio.pause();
         audio.currentTime = trimEnd;
-        setCurrentTime(activeAudioClip.start + activeAudioClip.duration);
+        setCurrentTime(musicClip.start + musicClip.duration);
         setIsPlaying(false);
         animationFrameRef.current = null;
         return;
       }
 
-      setCurrentTime(activeAudioClip.start + clipTime);
+      setCurrentTime(musicClip.start + clipTime);
 
       if (!audio.paused && !audio.ended) {
         animationFrameRef.current = requestAnimationFrame(tick);
@@ -620,24 +616,54 @@ export default function Editor() {
         animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, activeAudioClip]);
+  }, [isPlaying, musicClip]);
+
+  useEffect(() => {
+    if (!hasHydratedProject) {
+      return;
+    }
+
+    if (!autoSaveInitializedRef.current) {
+      autoSaveInitializedRef.current = true;
+      return;
+    }
+
+    setSaveState('saving');
+    const timeoutId = window.setTimeout(() => {
+      void persistNow(projectRef.current, assetBlobsRef.current);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [assetBlobs, hasHydratedProject, persistNow, project]);
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
-      <TopBar />
+    <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-50">
+      <TopBar projectName={project.name} saveState={saveState} onSave={handleSave} />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar onAddClip={handleAddClip} onUploadMusic={handleUploadMusic} onUploadImage={handleUploadImage} />
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <Sidebar
+          onAddSubtitleCue={handleAddSubtitleCue}
+          onAddBackgroundPlaceholder={handleAddBackgroundPlaceholder}
+          onUploadMusic={handleUploadMusic}
+          onUploadBackgroundMedia={handleUploadBackgroundMedia}
+        />
+        <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex flex-1 overflow-hidden">
-            <div className="flex-1 flex items-center justify-center p-4 bg-zinc-900">
-              <VideoPreview currentTime={currentTime} isPlaying={isPlaying} visualClip={activeVisualClip} subtitleText={subtitleText} />
+            <div className="flex flex-1 items-center justify-center bg-zinc-900 p-4">
+              <VideoPreview
+                currentTime={currentTime}
+                isPlaying={isPlaying}
+                visualClip={activeVisualClip}
+                subtitleText={subtitleText}
+              />
             </div>
             <PropertiesPanel clip={selectedClip} onChange={handleUpdateClip} />
           </div>
-          <div className="border-t border-zinc-800 bg-zinc-950 shrink-0" style={{ height: `${TIMELINE_HEIGHT}px` }}>
-            <Timeline 
-              tracks={INITIAL_TRACKS}
-              clips={clips}
+          <div className="shrink-0 border-t border-zinc-800 bg-zinc-950" style={{ height: `${TIMELINE_HEIGHT}px` }}>
+            <Timeline
+              tracks={TIMELINE_TRACKS}
+              clips={timelineClips}
               selectedClipId={selectedClipId}
               onSelectClip={setSelectedClipId}
               onChangeClip={handleUpdateClip}
@@ -646,7 +672,7 @@ export default function Editor() {
               currentTime={currentTime}
               onTimeChange={handleTimeChange}
               isPlaying={isPlaying}
-              hasPlayableAudio={Boolean(activeAudioClip?.assetUrl)}
+              hasPlayableAudio={Boolean(musicClip?.assetUrl)}
               onPlay={handlePlay}
               onPause={handlePause}
               onStop={stopPlayback}

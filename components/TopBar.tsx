@@ -3,17 +3,33 @@ import { Download, Save, Settings, Undo, Redo } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-function TopBar() {
+type SaveState = 'loading' | 'saving' | 'saved' | 'error';
+
+interface Props {
+  projectName: string;
+  saveState: SaveState;
+  onSave: () => void;
+}
+
+function TopBar({ projectName, saveState, onSave }: Props) {
+  const saveLabel = saveState === 'loading'
+    ? 'Loading'
+    : saveState === 'saving'
+      ? 'Saving'
+      : saveState === 'saved'
+        ? 'Saved'
+        : 'Retry Save';
+
   return (
     <header className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-4">
-        <div className="font-semibold text-sm">Untitled Project</div>
+        <div className="font-semibold text-sm">{projectName}</div>
         <Separator orientation="vertical" className="h-6 bg-zinc-800" />
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800">
+          <Button variant="ghost" size="icon" disabled className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-40">
             <Undo className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800">
+          <Button variant="ghost" size="icon" disabled className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-40">
             <Redo className="w-4 h-4" />
           </Button>
         </div>
@@ -22,11 +38,17 @@ function TopBar() {
         <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800">
           <Settings className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="sm" className="text-zinc-300 hover:text-white hover:bg-zinc-800">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onSave}
+          disabled={saveState === 'loading' || saveState === 'saving'}
+          className="text-zinc-300 hover:text-white hover:bg-zinc-800 disabled:opacity-60"
+        >
           <Save className="w-4 h-4 mr-2" />
-          Save
+          {saveLabel}
         </Button>
-        <Button size="sm" className="bg-white text-black hover:bg-zinc-200">
+        <Button size="sm" disabled className="bg-white text-black hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed">
           <Download className="w-4 h-4 mr-2" />
           Export
         </Button>

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { Clip } from '@/lib/types';
 
@@ -8,15 +9,56 @@ interface Props {
   subtitleText: string;
 }
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
 export default function VideoPreview({ currentTime, isPlaying, visualClip, subtitleText }: Props) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const beatPulse = isPlaying ? (Math.sin((currentTime * 140 * Math.PI) / 60) + 1) / 2 : 0.18;
   const imageScale = 1 + beatPulse * 0.04;
   const baseColor = visualClip?.color ?? '#2563eb';
+  const isVideoClip = visualClip?.assetKind === 'video' || visualClip?.visualType === 'video';
+  const visualOffset = useMemo(() => {
+    if (!visualClip) {
+      return 0;
+    }
+
+    return clamp(currentTime - visualClip.start, 0, visualClip.duration) + (visualClip.trimStart ?? 0);
+  }, [currentTime, visualClip]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideoClip || !visualClip?.assetUrl) {
+      return;
+    }
+
+    if (Math.abs(video.currentTime - visualOffset) > 0.12) {
+      video.currentTime = visualOffset;
+    }
+
+    if (isPlaying) {
+      void video.play().catch(() => undefined);
+      return;
+    }
+
+    video.pause();
+  }, [isPlaying, isVideoClip, visualClip?.assetUrl, visualOffset]);
 
   return (
     <div className="flex items-center justify-center w-full h-full min-h-0">
       <div className="relative h-full aspect-[9/16] rounded-lg overflow-hidden border border-zinc-800 shadow-2xl bg-black">
-        {visualClip?.assetUrl ? (
+        {visualClip?.assetUrl && isVideoClip ? (
+          <video
+            ref={videoRef}
+            src={visualClip.assetUrl}
+            muted
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{
+              transform: `scale(${imageScale})`,
+              filter: `saturate(${1.02 + beatPulse * 0.16}) brightness(${0.9 + beatPulse * 0.1})`,
+            }}
+          />
+        ) : visualClip?.assetUrl ? (
           <Image
             src={visualClip.assetUrl}
             alt={visualClip.name}
@@ -57,7 +99,7 @@ export default function VideoPreview({ currentTime, isPlaying, visualClip, subti
 
         <div className="absolute inset-x-0 top-6 flex justify-center">
           <div className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.24em] text-white/70 backdrop-blur-sm">
-            Phase 1 Preview
+            Phase 2 Preview
           </div>
         </div>
 
