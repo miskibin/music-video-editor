@@ -150,9 +150,9 @@ Current phase.
 
 This phase moves the app from a loose prototype into a product-shaped editor. The frontend now uses a versioned project document, a fixed three-layer data model, a persisted single active project, saved asset blobs, and uploaded background video support. The remaining work in this phase is hardening the model, improving the editor around that model, and preparing cleaner boundaries for later backend and render work.
 
-### Phase 3: Alignment and Media Intelligence
+### Phase 3: Lyric Sync and Media Discovery
 
-Add the first real backend workflows. This phase should align user-provided lyrics to audio with word-level timestamps and source or generate background visuals from lyrics plus user direction.
+Add the first real backend workflows. This phase should align user-provided lyrics to audio with word-level timestamps through a Lyric Sync workflow, then source or generate background visuals from lyrics plus user direction.
 
 ### Phase 4: Motion and Rendering
 

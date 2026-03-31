@@ -1,15 +1,20 @@
 import { z } from 'zod';
 import {
+  AlignmentLanguage,
   AssetRecord,
   BackgroundSegment,
   Clip,
   EditorProject,
+  LyricSyncState,
   MusicClip,
+  SubtitleAlignmentInput,
+  SubtitleAlignmentResult,
+  SubtitleAlignmentState,
   SubtitleCue,
   Track,
 } from '@/lib/types';
 
-export const PROJECT_VERSION = 2 as const;
+export const PROJECT_VERSION = 3 as const;
 export const ACTIVE_PROJECT_ID = 'active-project';
 export const BACKGROUND_TRACK_ID = 'v1' as const;
 export const SUBTITLE_TRACK_ID = 't1' as const;
@@ -76,6 +81,33 @@ const subtitleCueSchema = z.object({
   words: z.array(subtitleWordSchema),
 });
 
+const subtitleAlignmentInputSchema = z.object({
+  language: z.enum(['en', 'pl']),
+  excerptStart: z.number().min(0),
+  excerptEnd: z.number().min(0),
+  sourceText: z.string(),
+});
+
+const subtitleAlignmentResultSchema = z.object({
+  provider: z.string(),
+  generatedAt: z.string(),
+  warnings: z.array(z.string()),
+  lowConfidenceWordIds: z.array(z.string()),
+  cues: z.array(subtitleCueSchema),
+});
+
+const subtitleAlignmentStateSchema = z.object({
+  status: z.enum(['idle', 'running', 'review', 'applied', 'error']),
+  input: subtitleAlignmentInputSchema.nullable(),
+  result: subtitleAlignmentResultSchema.nullable(),
+  approvedAt: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+});
+
+const lyricSyncStateSchema = z.object({
+  subtitleAlignment: subtitleAlignmentStateSchema,
+});
+
 const subtitleLayerSchema = z.object({
   trackId: z.literal(SUBTITLE_TRACK_ID),
   sourceText: z.string(),
@@ -117,11 +149,120 @@ const editorProjectSchema = z.object({
     segments: z.array(backgroundSegmentSchema),
   }),
   assets: z.record(z.string(), assetRecordSchema),
+  lyricSync: lyricSyncStateSchema,
+});
+
+const legacyPhase3ProjectSchema = z.object({
+  version: z.literal(PROJECT_VERSION),
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  format: z.object({
+    aspectRatio: z.literal('9:16'),
+    width: z.number().min(1),
+    height: z.number().min(1),
+  }),
+  music: z.object({
+    trackId: z.literal(MUSIC_TRACK_ID),
+    clip: musicClipSchema.nullable(),
+  }),
+  subtitles: subtitleLayerSchema,
+  background: z.object({
+    trackId: z.literal(BACKGROUND_TRACK_ID),
+    segments: z.array(backgroundSegmentSchema),
+  }),
+  assets: z.record(z.string(), assetRecordSchema),
+  phase3: lyricSyncStateSchema,
+});
+
+const legacyEditorProjectSchema = z.object({
+  version: z.literal(2),
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  format: z.object({
+    aspectRatio: z.literal('9:16'),
+    width: z.number().min(1),
+    height: z.number().min(1),
+  }),
+  music: z.object({
+    trackId: z.literal(MUSIC_TRACK_ID),
+    clip: musicClipSchema.nullable(),
+  }),
+  subtitles: subtitleLayerSchema,
+  background: z.object({
+    trackId: z.literal(BACKGROUND_TRACK_ID),
+    segments: z.array(backgroundSegmentSchema),
+  }),
+  assets: z.record(z.string(), assetRecordSchema),
 });
 
 const nowIso = () => new Date().toISOString();
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const getProjectDurationHint = (project: {
+  music: { clip: MusicClip | null };
+  subtitles: { cues: SubtitleCue[] };
+  background: { segments: BackgroundSegment[] };
+}) => {
+  const cueEnd = project.subtitles.cues.reduce((max, cue) => Math.max(max, cue.start + cue.duration), 0);
+  const backgroundEnd = project.background.segments.reduce((max, segment) => Math.max(max, segment.start + segment.duration), 0);
+
+  return Math.max(
+    project.music.clip?.duration ?? 0,
+    cueEnd,
+    backgroundEnd,
+    12,
+  );
+};
+
+const createDefaultSubtitleAlignmentInput = (project: {
+  music: { clip: MusicClip | null };
+  subtitles: { sourceText: string; cues: SubtitleCue[] };
+  background: { segments: BackgroundSegment[] };
+}, language: AlignmentLanguage = 'en'): SubtitleAlignmentInput => ({
+  language,
+  excerptStart: 0,
+  excerptEnd: Math.max(
+    MIN_CLIP_DURATION,
+    Math.min(getProjectDurationHint(project), project.music.clip?.duration ?? getProjectDurationHint(project), 30),
+  ),
+  sourceText: project.subtitles.sourceText,
+});
+
+const createDefaultSubtitleAlignmentState = (input: SubtitleAlignmentInput | null): SubtitleAlignmentState => ({
+  status: 'idle',
+  input,
+  result: null,
+  approvedAt: null,
+  errorMessage: null,
+});
+
+const createDefaultLyricSyncState = (project: {
+  music: { clip: MusicClip | null };
+  subtitles: { sourceText: string; cues: SubtitleCue[] };
+  background: { segments: BackgroundSegment[] };
+}): LyricSyncState => ({
+  subtitleAlignment: createDefaultSubtitleAlignmentState(createDefaultSubtitleAlignmentInput(project)),
+});
+
+const migrateLegacyProject = (legacyProject: z.infer<typeof legacyEditorProjectSchema>): EditorProject => ({
+  ...legacyProject,
+  version: PROJECT_VERSION,
+  lyricSync: createDefaultLyricSyncState(legacyProject),
+});
+
+const migrateLegacyPhase3Project = (legacyProject: z.infer<typeof legacyPhase3ProjectSchema>): EditorProject => {
+  const { phase3, ...project } = legacyProject;
+
+  return {
+    ...project,
+    lyricSync: phase3,
+  };
+};
 
 export const createId = () => Math.random().toString(36).substring(2, 9);
 
@@ -148,14 +289,14 @@ export const createDefaultSubtitleCue = (): SubtitleCue => ({
 export const createDefaultProject = (): EditorProject => {
   const timestamp = nowIso();
 
-  return {
+  const defaultProject = {
     version: PROJECT_VERSION,
     id: ACTIVE_PROJECT_ID,
     name: 'Untitled Project',
     createdAt: timestamp,
     updatedAt: timestamp,
     format: {
-      aspectRatio: '9:16',
+      aspectRatio: '9:16' as const,
       width: 1080,
       height: 1920,
     },
@@ -173,6 +314,11 @@ export const createDefaultProject = (): EditorProject => {
       segments: [createDefaultBackgroundSegment()],
     },
     assets: {},
+  };
+
+  return {
+    ...defaultProject,
+    lyricSync: createDefaultLyricSyncState(defaultProject),
   };
 };
 
@@ -240,6 +386,16 @@ export const parseProjectDocument = (candidate: unknown): EditorProject => {
   const parsed = editorProjectSchema.safeParse(candidate);
 
   if (!parsed.success) {
+    const legacyPhase3Parsed = legacyPhase3ProjectSchema.safeParse(candidate);
+    if (legacyPhase3Parsed.success) {
+      return pruneUnusedAssets(migrateLegacyPhase3Project(legacyPhase3Parsed.data));
+    }
+
+    const legacyParsed = legacyEditorProjectSchema.safeParse(candidate);
+    if (legacyParsed.success) {
+      return pruneUnusedAssets(migrateLegacyProject(legacyParsed.data));
+    }
+
     return createDefaultProject();
   }
 
@@ -334,8 +490,104 @@ export const appendSubtitleCue = (
     ...project,
     subtitles: {
       ...project.subtitles,
-      sourceText: nextCues.map((subtitleCue) => subtitleCue.text).join('\n').trim() || cue.text,
       cues: nextCues,
+    },
+  });
+};
+
+export const updateSubtitleAlignmentInput = (
+  project: EditorProject,
+  input: SubtitleAlignmentInput,
+): EditorProject => markProjectUpdated({
+  ...project,
+  lyricSync: {
+    ...project.lyricSync,
+    subtitleAlignment: {
+      ...project.lyricSync.subtitleAlignment,
+      input,
+      errorMessage: null,
+    },
+  },
+});
+
+export const startSubtitleAlignment = (
+  project: EditorProject,
+  input: SubtitleAlignmentInput,
+): EditorProject => markProjectUpdated({
+  ...project,
+  lyricSync: {
+    ...project.lyricSync,
+    subtitleAlignment: {
+      status: 'running',
+      input,
+      result: null,
+      approvedAt: null,
+      errorMessage: null,
+    },
+  },
+});
+
+export const storeSubtitleAlignmentResult = (
+  project: EditorProject,
+  input: SubtitleAlignmentInput,
+  result: SubtitleAlignmentResult,
+): EditorProject => markProjectUpdated({
+  ...project,
+  lyricSync: {
+    ...project.lyricSync,
+    subtitleAlignment: {
+      status: 'review',
+      input,
+      result,
+      approvedAt: null,
+      errorMessage: null,
+    },
+  },
+});
+
+export const storeSubtitleAlignmentError = (
+  project: EditorProject,
+  input: SubtitleAlignmentInput,
+  errorMessage: string,
+): EditorProject => markProjectUpdated({
+  ...project,
+  lyricSync: {
+    ...project.lyricSync,
+    subtitleAlignment: {
+      ...project.lyricSync.subtitleAlignment,
+      status: 'error',
+      input,
+      errorMessage,
+    },
+  },
+});
+
+export const applySubtitleAlignmentResult = (
+  project: EditorProject,
+  cues: SubtitleCue[],
+): EditorProject => {
+  const existingResult = project.lyricSync.subtitleAlignment.result;
+  const sortedCues = [...cues].sort((left, right) => left.start - right.start);
+
+  return markProjectUpdated({
+    ...project,
+    subtitles: {
+      ...project.subtitles,
+      sourceText: project.lyricSync.subtitleAlignment.input?.sourceText ?? project.subtitles.sourceText,
+      cues: sortedCues,
+    },
+    lyricSync: {
+      ...project.lyricSync,
+      subtitleAlignment: {
+        ...project.lyricSync.subtitleAlignment,
+        status: 'applied',
+        approvedAt: nowIso(),
+        result: existingResult ? {
+          ...existingResult,
+          cues: sortedCues,
+        } : existingResult,
+        errorMessage: null,
+      },
     },
   });
 };
@@ -448,7 +700,6 @@ export const updateTimelineClipInProject = (
       ...project,
       subtitles: {
         ...project.subtitles,
-        sourceText: nextCues.map((cue) => cue.text).join('\n').trim() || project.subtitles.sourceText,
         cues: nextCues,
       },
     });
@@ -519,7 +770,6 @@ export const deleteTimelineClipFromProject = (
       ...project,
       subtitles: {
         ...project.subtitles,
-        sourceText: nextCues.map((cue) => cue.text).join('\n').trim(),
         cues: nextCues,
       },
     });

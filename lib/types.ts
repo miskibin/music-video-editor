@@ -6,6 +6,10 @@ export type AssetKind = 'audio' | 'image' | 'video';
 
 export type AssetSource = 'upload' | 'sample' | 'ai-generated' | 'ai-selected';
 
+export type AlignmentLanguage = 'en' | 'pl';
+
+export type SubtitleAlignmentStatus = 'idle' | 'running' | 'review' | 'applied' | 'error';
+
 export interface AssetRecord {
   id: string;
   kind: AssetKind;
@@ -46,6 +50,33 @@ export interface SubtitleCue {
   duration: number;
   text: string;
   words: SubtitleWord[];
+}
+
+export interface SubtitleAlignmentInput {
+  language: AlignmentLanguage;
+  excerptStart: number;
+  excerptEnd: number;
+  sourceText: string;
+}
+
+export interface SubtitleAlignmentResult {
+  provider: string;
+  generatedAt: string;
+  warnings: string[];
+  lowConfidenceWordIds: string[];
+  cues: SubtitleCue[];
+}
+
+export interface SubtitleAlignmentState {
+  status: SubtitleAlignmentStatus;
+  input: SubtitleAlignmentInput | null;
+  result: SubtitleAlignmentResult | null;
+  approvedAt: string | null;
+  errorMessage: string | null;
+}
+
+export interface LyricSyncState {
+  subtitleAlignment: SubtitleAlignmentState;
 }
 
 export interface SubtitleLayer {
@@ -95,7 +126,7 @@ export interface ProjectFormat {
 }
 
 export interface EditorProject {
-  version: 2;
+  version: 3;
   id: string;
   name: string;
   createdAt: string;
@@ -105,6 +136,7 @@ export interface EditorProject {
   subtitles: SubtitleLayer;
   background: BackgroundLayer;
   assets: Record<string, AssetRecord>;
+  lyricSync: LyricSyncState;
 }
 
 export interface Clip {

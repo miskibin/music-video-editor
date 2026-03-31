@@ -2,14 +2,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
+import SubtitleAlignmentModal from '@/components/SubtitleAlignmentModal';
 import VideoPreview from '@/components/VideoPreview';
 import Timeline from '@/components/Timeline';
 import PropertiesPanel from '@/components/PropertiesPanel';
-import { AssetRecord, BackgroundSegment, Clip, MusicClip, SubtitleCue } from '@/lib/types';
+import { AssetRecord, BackgroundSegment, Clip, MusicClip, SubtitleAlignmentInput, SubtitleCue } from '@/lib/types';
 import {
   ACTIVE_PROJECT_ID,
   MIN_CLIP_DURATION,
   TIMELINE_TRACKS,
+  applySubtitleAlignmentResult,
   appendSubtitleCue,
   buildTimelineClips,
   createDefaultBackgroundSegment,
@@ -21,6 +23,9 @@ import {
   parseProjectDocument,
   replaceMusicClip,
   sanitizeProjectAgainstMissingAssets,
+  startSubtitleAlignment,
+  storeSubtitleAlignmentError,
+  storeSubtitleAlignmentResult,
   updateTimelineClipInProject,
   upsertBackgroundSegment,
 } from '@/lib/project';
@@ -39,6 +44,7 @@ import {
   waitForAudioMetadata,
   waitForAudioReady,
 } from '@/lib/media-utils';
+import { alignSubtitles } from '@/lib/lyric-sync';
 
 type AssetBlobMap = Record<string, Blob>;
 type SaveState = 'loading' | 'saving' | 'saved' | 'error';
@@ -99,6 +105,7 @@ export default function Editor() {
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isSubtitleAlignmentOpen, setIsSubtitleAlignmentOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('loading');
   const [hasHydratedProject, setHasHydratedProject] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -109,6 +116,7 @@ export default function Editor() {
   const assetBlobsRef = useRef(assetBlobs);
   const persistedAssetIdsRef = useRef<Set<string>>(new Set());
   const autoSaveInitializedRef = useRef(false);
+  const subtitleAlignmentRequestIdRef = useRef(0);
 
   useEffect(() => {
     projectRef.current = project;
@@ -149,6 +157,37 @@ export default function Editor() {
   const subtitleText = useMemo(
     () => activeTextClip?.overlayText || project.subtitles.sourceText || 'Your subtitles here',
     [activeTextClip, project.subtitles.sourceText],
+  );
+  const subtitleAlignmentInput = useMemo<SubtitleAlignmentInput>(() => {
+    if (project.lyricSync.subtitleAlignment.input) {
+      return project.lyricSync.subtitleAlignment.input;
+    }
+
+    const excerptEnd = Math.max(
+      MIN_CLIP_DURATION,
+      Math.min(musicClip?.duration ?? project.background.segments[0]?.duration ?? 12, 30),
+    );
+
+    return {
+      language: 'en',
+      excerptStart: 0,
+      excerptEnd,
+      sourceText: project.subtitles.sourceText,
+    };
+  }, [musicClip?.duration, project.background.segments, project.lyricSync.subtitleAlignment.input, project.subtitles.sourceText]);
+  const subtitleAlignmentModalKey = useMemo(
+    () => [
+      project.lyricSync.subtitleAlignment.status,
+      project.lyricSync.subtitleAlignment.result?.generatedAt ?? 'no-result',
+      project.lyricSync.subtitleAlignment.input?.excerptStart ?? 0,
+      project.lyricSync.subtitleAlignment.input?.excerptEnd ?? 0,
+    ].join(':'),
+    [
+      project.lyricSync.subtitleAlignment.input?.excerptEnd,
+      project.lyricSync.subtitleAlignment.input?.excerptStart,
+      project.lyricSync.subtitleAlignment.result?.generatedAt,
+      project.lyricSync.subtitleAlignment.status,
+    ],
   );
 
   const persistNow = useCallback(async (nextProject: typeof project, nextAssetBlobs: AssetBlobMap) => {
@@ -215,6 +254,47 @@ export default function Editor() {
   const handleSave = useCallback(() => {
     void persistNow(projectRef.current, assetBlobsRef.current);
   }, [persistNow]);
+
+  const handleOpenSubtitleAlignment = useCallback(() => {
+    setIsSubtitleAlignmentOpen(true);
+  }, []);
+
+  const handleCloseSubtitleAlignment = useCallback(() => {
+    if (projectRef.current.lyricSync.subtitleAlignment.status === 'running') {
+      return;
+    }
+
+    setIsSubtitleAlignmentOpen(false);
+  }, []);
+
+  const handleRunSubtitleAlignment = useCallback(async (input: SubtitleAlignmentInput) => {
+    const requestId = subtitleAlignmentRequestIdRef.current + 1;
+    subtitleAlignmentRequestIdRef.current = requestId;
+    setProject((currentProject) => startSubtitleAlignment(currentProject, input));
+
+    try {
+      const result = await alignSubtitles(input);
+
+      if (subtitleAlignmentRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setProject((currentProject) => storeSubtitleAlignmentResult(currentProject, input, result));
+    } catch (error) {
+      if (subtitleAlignmentRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : 'Subtitle alignment failed.';
+      setProject((currentProject) => storeSubtitleAlignmentError(currentProject, input, errorMessage));
+    }
+  }, []);
+
+  const handleApplySubtitleAlignment = useCallback((cues: SubtitleCue[]) => {
+    setProject((currentProject) => applySubtitleAlignmentResult(currentProject, cues));
+    setSelectedClipId(cues[0]?.id ?? null);
+    setIsSubtitleAlignmentOpen(false);
+  }, []);
 
   const handleAddSubtitleCue = useCallback(() => {
     const subtitleCue: SubtitleCue = {
@@ -640,7 +720,14 @@ export default function Editor() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-50">
-      <TopBar projectName={project.name} saveState={saveState} onSave={handleSave} />
+      <TopBar
+        projectName={project.name}
+        saveState={saveState}
+        onSave={handleSave}
+        onOpenSubtitleAlignment={handleOpenSubtitleAlignment}
+        subtitleAlignmentStatus={project.lyricSync.subtitleAlignment.status}
+        subtitleAlignmentDisabled={!musicClip?.assetUrl || project.lyricSync.subtitleAlignment.status === 'running'}
+      />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           onAddSubtitleCue={handleAddSubtitleCue}
@@ -681,6 +768,17 @@ export default function Editor() {
           </div>
         </div>
       </div>
+      {isSubtitleAlignmentOpen ? (
+        <SubtitleAlignmentModal
+          key={subtitleAlignmentModalKey}
+          musicDuration={musicClip?.duration ?? null}
+          alignmentState={project.lyricSync.subtitleAlignment}
+          initialInput={subtitleAlignmentInput}
+          onClose={handleCloseSubtitleAlignment}
+          onRun={handleRunSubtitleAlignment}
+          onApply={handleApplySubtitleAlignment}
+        />
+      ) : null}
     </div>
   );
 }
