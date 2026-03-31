@@ -36,6 +36,8 @@ interface Props {
   beatGridStartSec?: number;
   /** Subtitle cue start times (seconds) for snapping. */
   subtitleSnapTimes?: readonly number[];
+  /** Drop media from the gallery onto a track at a timeline time. */
+  onDropMediaFromGallery?: (payload: { trackId: string; timeSec: number; assetId: string }) => void;
 }
 
 const EMPTY_CLIPS: Clip[] = [];
@@ -59,10 +61,12 @@ export default function Timeline({
   beatBpm = null,
   beatGridStartSec = 0,
   subtitleSnapTimes = [],
+  onDropMediaFromGallery,
 }: Props) {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [trackAreaHeight, setTrackAreaHeight] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   const timelineRootRef = useRef<HTMLDivElement>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -210,6 +214,7 @@ export default function Timeline({
     onSelectClip(null);
   }, [onSelectClip]);
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollLeft(e.currentTarget.scrollLeft);
     if (rulerRef.current) {
       rulerRef.current.scrollLeft = e.currentTarget.scrollLeft;
     }
@@ -409,6 +414,8 @@ export default function Timeline({
               track={track}
               trackRowHeight={trackRowHeight}
               width={timelineWidth}
+              timelineDuration={timelineDuration}
+              scrollLeft={scrollLeft}
               clips={clipsByTrack.get(track.id) || EMPTY_CLIPS}
               selectedClipId={selectedClipId}
               pixelsPerSecond={pixelsPerSecond}
@@ -417,6 +424,7 @@ export default function Timeline({
               onSelectClip={onSelectClip}
               onChangeClip={onChangeClip}
               onDragEnd={onDragEnd}
+              onDropMediaFromGallery={onDropMediaFromGallery}
             />
           ))}
         </div>

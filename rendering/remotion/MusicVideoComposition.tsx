@@ -10,7 +10,11 @@ export const MusicVideoComposition = ({ manifest }: MusicVideoCompositionProps) 
       <BackgroundTrack manifest={manifest} />
       {manifest.music ? (
         <Sequence durationInFrames={manifest.music.durationInFrames}>
-          <Audio src={manifest.music.src} trimBefore={manifest.music.trimBefore} />
+          <Audio
+            src={manifest.music.src}
+            trimBefore={manifest.music.trimBefore}
+            trimAfter={manifest.music.trimAfter}
+          />
         </Sequence>
       ) : null}
       <SubtitleTrack cues={manifest.subtitleCues} />

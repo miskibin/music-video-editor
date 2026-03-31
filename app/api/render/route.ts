@@ -1,5 +1,5 @@
-import path from 'node:path';
 import { parseProjectDocument } from '@/lib/project';
+import path from 'node:path';
 import {
   createRenderManifest,
   getReferencedRenderAssetIds,
@@ -8,10 +8,13 @@ import {
 import {
   cleanupRenderJob,
   createRenderJobId,
-  getRenderJobDir,
+  ensureRenderJobWorkspace,
+  getRenderOutputPath,
   stageRenderAsset,
   writeRenderAssetIndex,
+  writeRenderJobMetadata,
 } from '@/lib/server/render-jobs';
+import { trimAudioWithFfmpeg } from '@/lib/server/ffmpeg';
 import {
   createRenderJobStatus,
   deleteRenderJobStatus,
@@ -26,12 +29,59 @@ export const maxDuration = 300;
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Render failed.';
 const FILE_CLEANUP_DELAY_MS = 10 * 60 * 1000;
 
+const maybePretrimMusicAsset = async (
+  jobId: string,
+  project: ReturnType<typeof parseProjectDocument>,
+  assetIndexRecord: Record<string, Awaited<ReturnType<typeof stageRenderAsset>>>,
+) => {
+  const musicClip = project.music.clip;
+  const musicAssetId = musicClip?.assetId;
+  if (!musicClip || !musicAssetId) {
+    return false;
+  }
+
+  const stagedMusicAsset = assetIndexRecord[musicAssetId];
+  if (!stagedMusicAsset) {
+    return false;
+  }
+
+  const trimStart = Math.max(0, musicClip.trimStart ?? 0);
+  const duration = Math.max(0, musicClip.duration);
+  const sourceDuration = Math.max(duration, musicClip.sourceDuration ?? duration);
+  const shouldPretrim = trimStart > 0 || duration < sourceDuration;
+
+  if (!shouldPretrim) {
+    return false;
+  }
+
+  const { assetsDir } = await ensureRenderJobWorkspace(jobId);
+  const trimmedFilePath = path.join(assetsDir, `${musicAssetId}-trimmed.m4a`);
+
+  await trimAudioWithFfmpeg({
+    inputPath: stagedMusicAsset.filePath,
+    outputPath: trimmedFilePath,
+    startSeconds: trimStart,
+    durationSeconds: duration,
+  });
+
+  assetIndexRecord[musicAssetId] = {
+    assetId: musicAssetId,
+    filePath: trimmedFilePath,
+    fileName: `${musicAssetId}-trimmed.m4a`,
+    mimeType: 'audio/mp4',
+  };
+
+  return true;
+};
+
 const processRenderJob = async (
   jobId: string,
   manifest: ReturnType<typeof createRenderManifest>,
   outputPath: string,
   downloadName: string,
 ) => {
+  const totalFrames = Math.max(manifest.durationInFrames, 1);
+
   try {
     updateRenderJobStatus(jobId, {
       state: 'bundling',
@@ -51,12 +101,23 @@ const processRenderJob = async (
         });
       },
       onRenderProgress: (progress) => {
-        const percent = Math.max(0.18, Math.min(0.98, progress.progress));
-        const stageLabel = progress.stitchStage === 'encoding' ? 'Encoding frames' : 'Muxing video';
+        const renderedRatio = Math.max(0, Math.min(1, progress.renderedFrames / totalFrames));
+        const encodedRatio = Math.max(0, Math.min(1, progress.encodedFrames / totalFrames));
+
+        let percent = 0.18 + renderedRatio * 0.68;
+        let message = `Rendering frames ${Math.round(renderedRatio * 100)}% (${progress.renderedFrames}/${totalFrames})`;
+
+        if (renderedRatio >= 0.999) {
+          percent = 0.86 + encodedRatio * 0.1;
+          message = progress.stitchStage === 'muxing'
+            ? `Finalizing video ${Math.round(encodedRatio * 100)}%`
+            : `Encoding video ${Math.round(encodedRatio * 100)}% (${progress.encodedFrames}/${totalFrames})`;
+        }
+
         updateRenderJobStatus(jobId, {
           state: 'rendering',
-          progress: percent,
-          message: `${stageLabel} ${Math.round(progress.progress * 100)}%`,
+          progress: Math.max(0.18, Math.min(0.98, percent)),
+          message,
         });
       },
     });
@@ -142,11 +203,22 @@ export async function POST(request: Request) {
       assetSources[assetId] = `${origin}/api/render-assets/${encodeURIComponent(jobId)}/${encodeURIComponent(assetId)}`;
     }
 
+    updateRenderJobStatus(jobId, {
+      state: 'staging',
+      progress: 0.095,
+      message: 'Preparing trimmed music window...',
+    });
+
+    const audioAlreadyTrimmed = await maybePretrimMusicAsset(jobId, parsedProject, assetIndexRecord);
+
     await writeRenderAssetIndex(jobId, assetIndexRecord);
 
-    const manifest = createRenderManifest(parsedProject, assetSources);
-    const outputPath = path.join(getRenderJobDir(jobId), 'output.mp4');
+    const manifest = createRenderManifest(parsedProject, assetSources, undefined, {
+      audioAlreadyTrimmed,
+    });
+    const outputPath = getRenderOutputPath(jobId);
     const downloadName = `${sanitizeOutputName(parsedProject.name)}.mp4`;
+    await writeRenderJobMetadata(jobId, { downloadName });
 
     updateRenderJobStatus(jobId, {
       state: 'queued',

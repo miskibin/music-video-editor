@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { MEDIA_GALLERY_DRAG_MIME, parseMediaGalleryDragPayload } from '@/lib/media-drag';
 import { Clip } from '@/lib/types';
 import { TIMELINE_SNAP_THRESHOLD_PX } from '@/lib/constants';
 import { snapNearestTime } from '@/lib/timeline-snap';
@@ -164,6 +165,8 @@ interface Props {
   onSelect: (id: string) => void;
   onChange: (id: string, updates: Partial<Clip>) => void;
   onDragEnd: (id: string) => void;
+  /** When set, dropping a gallery asset on this clip places at the pointer time on the clip. */
+  onGalleryMediaDrop?: (payload: { timeSec: number; assetId: string }) => void;
 }
 
 function TimelineClip({
@@ -175,6 +178,7 @@ function TimelineClip({
   onSelect,
   onChange,
   onDragEnd,
+  onGalleryMediaDrop,
 }: Props) {
   const isAudioClip = clip.trackId.startsWith('a');
   const dragStateRef = React.useRef<DragState | null>(null);
@@ -368,9 +372,49 @@ function TimelineClip({
     transform: `translateX(${-displayedTrimStart * pixelsPerSecond}px)`,
   }), [displayedTrimStart, pixelsPerSecond, waveformSourceDuration]);
 
+  const handleGalleryDragOver = React.useCallback(
+    (event: React.DragEvent) => {
+      if (!onGalleryMediaDrop) {
+        return;
+      }
+
+      if (!event.dataTransfer.types.includes(MEDIA_GALLERY_DRAG_MIME)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = 'copy';
+    },
+    [onGalleryMediaDrop],
+  );
+
+  const handleGalleryDrop = React.useCallback(
+    (event: React.DragEvent) => {
+      if (!onGalleryMediaDrop) {
+        return;
+      }
+
+      const payload = parseMediaGalleryDragPayload(event.dataTransfer);
+      if (!payload) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const timeSec = clip.start + x / pixelsPerSecond;
+      onGalleryMediaDrop({ timeSec, assetId: payload.assetId });
+    },
+    [clip.start, onGalleryMediaDrop, pixelsPerSecond],
+  );
+
   return (
     <div
       onPointerDown={(e) => handlePointerDown(e, 'move')}
+      onDragOver={handleGalleryDragOver}
+      onDrop={handleGalleryDrop}
       onClick={(e) => e.stopPropagation()}
       className={`absolute top-1 bottom-1 rounded-md border flex items-center px-2 overflow-hidden cursor-grab active:cursor-grabbing group ${
         selected ? 'ring-2 ring-white z-10' : 'opacity-90 hover:opacity-100'
@@ -418,7 +462,8 @@ function areClipPropsEqual(previous: Props, next: Props) {
     && previous.snapPoints === next.snapPoints
     && previous.onSelect === next.onSelect
     && previous.onChange === next.onChange
-    && previous.onDragEnd === next.onDragEnd;
+    && previous.onDragEnd === next.onDragEnd
+    && previous.onGalleryMediaDrop === next.onGalleryMediaDrop;
 }
 
 export default React.memo(TimelineClip, areClipPropsEqual);

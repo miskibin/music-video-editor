@@ -138,6 +138,8 @@ export interface EditorProject {
   subtitles: SubtitleLayer;
   background: BackgroundLayer;
   assets: Record<string, AssetRecord>;
+  /** Asset IDs kept for the media gallery (library-only or also on timeline). */
+  mediaLibraryAssetIds: string[];
   lyricSync: LyricSyncState;
 }
 

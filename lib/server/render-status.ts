@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { getRenderJobDir } from '@/lib/server/render-jobs';
+
 type RenderJobState = 'queued' | 'staging' | 'bundling' | 'rendering' | 'completed' | 'error';
 
 export type RenderJobStatus = {
@@ -15,6 +19,14 @@ export type RenderJobStatus = {
 const JOB_TTL_MS = 10 * 60 * 1000;
 const renderJobs = new Map<string, RenderJobStatus>();
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const STATUS_FILE = 'status.json';
+
+const getStatusPath = (jobId: string) => path.join(getRenderJobDir(jobId), STATUS_FILE);
+
+const persistStatus = (status: RenderJobStatus) => {
+  fs.mkdirSync(getRenderJobDir(status.jobId), { recursive: true });
+  fs.writeFileSync(getStatusPath(status.jobId), JSON.stringify(status, null, 2), 'utf8');
+};
 
 const scheduleCleanup = (jobId: string) => {
   const existingTimer = cleanupTimers.get(jobId);
@@ -45,11 +57,26 @@ export const createRenderJobStatus = (jobId: string): RenderJobStatus => {
   };
 
   renderJobs.set(jobId, status);
+  persistStatus(status);
   scheduleCleanup(jobId);
   return status;
 };
 
-export const getRenderJobStatus = (jobId: string) => renderJobs.get(jobId) ?? null;
+export const getRenderJobStatus = (jobId: string) => {
+  const inMemory = renderJobs.get(jobId);
+  if (inMemory) {
+    return inMemory;
+  }
+
+  try {
+    const fileContents = fs.readFileSync(getStatusPath(jobId), 'utf8');
+    const parsed = JSON.parse(fileContents) as RenderJobStatus;
+    renderJobs.set(jobId, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+};
 
 export const updateRenderJobStatus = (
   jobId: string,
@@ -67,6 +94,7 @@ export const updateRenderJobStatus = (
   };
 
   renderJobs.set(jobId, nextStatus);
+  persistStatus(nextStatus);
   scheduleCleanup(jobId);
   return nextStatus;
 };
@@ -77,5 +105,11 @@ export const deleteRenderJobStatus = (jobId: string) => {
   if (existingTimer) {
     clearTimeout(existingTimer);
     cleanupTimers.delete(jobId);
+  }
+
+  try {
+    fs.rmSync(getStatusPath(jobId), { force: true });
+  } catch {
+    // Best effort cleanup only.
   }
 };

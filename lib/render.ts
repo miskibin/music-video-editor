@@ -16,7 +16,12 @@ export type RenderAudioTrack = {
   src: string;
   durationInFrames: number;
   trimBefore: number;
+  trimAfter: number;
   bpm: number | null;
+};
+
+type CreateRenderManifestOptions = {
+  audioAlreadyTrimmed?: boolean;
 };
 
 export type RenderSubtitleWord = {
@@ -194,6 +199,7 @@ export const createRenderManifest = (
   project: EditorProject,
   assetSources: Record<string, string>,
   fps = RENDER_FPS,
+  options?: CreateRenderManifestOptions,
 ): RenderManifest => {
   const music = project.music.clip;
   const musicSrc = music?.assetId ? assetSources[music.assetId] : undefined;
@@ -221,7 +227,10 @@ export const createRenderManifest = (
   const musicTrack = music && musicSrc ? {
     src: musicSrc,
     durationInFrames: secondsToFrames(music.duration, fps),
-    trimBefore: maybeSecondsToFrames(music.trimStart ?? 0, fps),
+    trimBefore: options?.audioAlreadyTrimmed ? 0 : maybeSecondsToFrames(music.trimStart ?? 0, fps),
+    trimAfter: options?.audioAlreadyTrimmed
+      ? secondsToFrames(music.duration, fps)
+      : maybeSecondsToFrames((music.trimStart ?? 0) + music.duration, fps),
     bpm: music.bpm ?? null,
   } satisfies RenderAudioTrack : null;
 

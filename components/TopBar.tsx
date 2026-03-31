@@ -51,9 +51,9 @@ function TopBar({
       : subtitleAlignmentStatus === 'applied'
         ? 'Re-run Lyric Sync'
         : 'Run Lyric Sync';
-  const exportLabel = renderState === 'rendering' ? 'Rendering MP4' : 'Export MP4';
   const exportTone = renderState === 'error' ? 'text-rose-300' : 'text-zinc-400';
   const progressPercent = Math.max(0, Math.min(100, Math.round(renderProgress * 100)));
+  const exportLabel = renderState === 'rendering' ? `Rendering ${progressPercent}%` : 'Export MP4';
 
   return (
     <header className="relative h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">

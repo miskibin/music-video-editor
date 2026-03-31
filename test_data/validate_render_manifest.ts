@@ -132,6 +132,7 @@ const project: EditorProject = {
       source: 'upload',
     },
   },
+  mediaLibraryAssetIds: ['audio-1', 'video-1'],
   lyricSync: {
     subtitleAlignment: {
       status: 'idle',
@@ -150,6 +151,7 @@ const manifest = createRenderManifest(project, {
 
 assert.equal(manifest.fps, RENDER_FPS);
 assert.equal(manifest.music?.trimBefore, 60);
+assert.equal(manifest.music?.trimAfter, 300);
 assert.equal(manifest.music?.durationInFrames, 240);
 assert.equal(manifest.backgroundSegments.length, 2);
 assert.equal(manifest.backgroundSegments[1].trimBefore, 30);

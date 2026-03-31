@@ -150,6 +150,7 @@ const editorProjectSchema = z.object({
     segments: z.array(backgroundSegmentSchema),
   }),
   assets: z.record(z.string(), assetRecordSchema),
+  mediaLibraryAssetIds: z.array(z.string()).default([]),
   lyricSync: lyricSyncStateSchema,
 });
 
@@ -174,6 +175,7 @@ const legacyPhase3ProjectSchema = z.object({
     segments: z.array(backgroundSegmentSchema),
   }),
   assets: z.record(z.string(), assetRecordSchema),
+  mediaLibraryAssetIds: z.array(z.string()).optional(),
   phase3: lyricSyncStateSchema,
 });
 
@@ -254,6 +256,7 @@ const migrateLegacyProject = (legacyProject: z.infer<typeof legacyEditorProjectS
   ...legacyProject,
   version: PROJECT_VERSION,
   lyricSync: createDefaultLyricSyncState(legacyProject),
+  mediaLibraryAssetIds: [],
 });
 
 const migrateLegacyPhase3Project = (legacyProject: z.infer<typeof legacyPhase3ProjectSchema>): EditorProject => {
@@ -262,6 +265,7 @@ const migrateLegacyPhase3Project = (legacyProject: z.infer<typeof legacyPhase3Pr
   return {
     ...project,
     lyricSync: phase3,
+    mediaLibraryAssetIds: legacyProject.mediaLibraryAssetIds ?? [],
   };
 };
 
@@ -315,6 +319,7 @@ export const createDefaultProject = (): EditorProject => {
       segments: [createDefaultBackgroundSegment()],
     },
     assets: {},
+    mediaLibraryAssetIds: [],
   };
 
   return {
@@ -391,26 +396,93 @@ export const getReferencedAssetIds = (project: EditorProject) => {
   return ids;
 };
 
-export const pruneUnusedAssets = (project: EditorProject): EditorProject => {
-  const referencedIds = getReferencedAssetIds(project);
-  let didChange = false;
-  const nextAssets = Object.fromEntries(
-    Object.entries(project.assets).filter(([assetId]) => {
-      const keep = referencedIds.has(assetId);
-      if (!keep) {
-        didChange = true;
-      }
-      return keep;
-    }),
-  );
+/** Timeline references plus media gallery pins — these asset rows (and blobs) are retained. */
+export const getRetainedAssetIds = (project: EditorProject): Set<string> => {
+  const ids = new Set(getReferencedAssetIds(project));
+  project.mediaLibraryAssetIds.forEach((id) => ids.add(id));
+  return ids;
+};
 
-  if (!didChange) {
+const appendMediaLibraryAssetId = (project: EditorProject, assetId: string): string[] => (
+  project.mediaLibraryAssetIds.includes(assetId)
+    ? project.mediaLibraryAssetIds
+    : [...project.mediaLibraryAssetIds, assetId]
+);
+
+export const addLibraryMediaToProject = (
+  project: EditorProject,
+  entries: { asset: AssetRecord }[],
+): EditorProject => {
+  let nextAssets = { ...project.assets };
+  let nextIds = [...project.mediaLibraryAssetIds];
+  for (const { asset } of entries) {
+    nextAssets[asset.id] = asset;
+    if (!nextIds.includes(asset.id)) {
+      nextIds = [...nextIds, asset.id];
+    }
+  }
+
+  return markProjectUpdated({
+    ...project,
+    assets: nextAssets,
+    mediaLibraryAssetIds: nextIds,
+  });
+};
+
+export const removeLibraryAsset = (
+  project: EditorProject,
+  assetId: string,
+): { project: EditorProject } | { error: 'in_use' } => {
+  if (getReferencedAssetIds(project).has(assetId)) {
+    return { error: 'in_use' };
+  }
+
+  const nextLibraryIds = project.mediaLibraryAssetIds.filter((id) => id !== assetId);
+
+  if (!project.assets[assetId]) {
+    if (nextLibraryIds.length === project.mediaLibraryAssetIds.length) {
+      return { project };
+    }
+
+    return {
+      project: markProjectUpdated({
+        ...project,
+        mediaLibraryAssetIds: nextLibraryIds,
+      }),
+    };
+  }
+
+  const { [assetId]: _removed, ...restAssets } = project.assets;
+
+  return {
+    project: markProjectUpdated({
+      ...project,
+      mediaLibraryAssetIds: nextLibraryIds,
+      assets: restAssets,
+    }),
+  };
+};
+
+export const pruneUnusedAssets = (project: EditorProject): EditorProject => {
+  const retainedIds = getRetainedAssetIds(project);
+  const nextAssets = Object.fromEntries(
+    Object.entries(project.assets).filter(([assetId]) => retainedIds.has(assetId)),
+  );
+  const nextLibraryIds = project.mediaLibraryAssetIds.filter((id) => nextAssets[id]);
+
+  const assetsChanged = Object.keys(nextAssets).length !== Object.keys(project.assets).length
+    || Object.keys(project.assets).some((id) => !nextAssets[id]);
+  const libraryChanged = nextLibraryIds.length !== project.mediaLibraryAssetIds.length
+    || nextLibraryIds.some((id, i) => id !== project.mediaLibraryAssetIds[i]);
+
+  if (!assetsChanged && !libraryChanged) {
     return project;
   }
 
   return {
     ...project,
     assets: nextAssets,
+    mediaLibraryAssetIds: nextLibraryIds,
   };
 };
 
@@ -447,6 +519,7 @@ export const sanitizeProjectAgainstMissingAssets = (
   const nextAssets = Object.fromEntries(
     Object.entries(project.assets).filter(([assetId]) => availableAssetIds.has(assetId)),
   );
+  const nextLibraryIds = project.mediaLibraryAssetIds.filter((id) => availableAssetIds.has(id));
 
   return pruneUnusedAssets({
     ...project,
@@ -459,6 +532,7 @@ export const sanitizeProjectAgainstMissingAssets = (
       segments: nextSegments,
     },
     assets: nextAssets,
+    mediaLibraryAssetIds: nextLibraryIds,
   });
 };
 
@@ -648,6 +722,7 @@ export const replaceMusicClip = (
   asset: AssetRecord,
 ): EditorProject => pruneUnusedAssets(markProjectUpdated({
   ...project,
+  mediaLibraryAssetIds: appendMediaLibraryAssetId(project, asset.id),
   music: {
     ...project.music,
     clip,
@@ -690,6 +765,7 @@ export const upsertBackgroundSegment = (
 
   return pruneUnusedAssets(markProjectUpdated({
     ...project,
+    mediaLibraryAssetIds: asset ? appendMediaLibraryAssetId(project, asset.id) : project.mediaLibraryAssetIds,
     background: {
       ...project.background,
       segments: shouldReplacePlaceholder ? [segment] : [...project.background.segments, segment],

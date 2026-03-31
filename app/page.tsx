@@ -4,7 +4,7 @@ import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import SubtitleAlignmentModal from '@/components/SubtitleAlignmentModal';
 import VideoPreview from '@/components/VideoPreview';
-import PreviewWorkspacePanel from '@/components/PreviewWorkspacePanel';
+import MediaGalleryPanel from '@/components/MediaGalleryPanel';
 import Timeline from '@/components/Timeline';
 import PropertiesPanel from '@/components/PropertiesPanel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -12,8 +12,12 @@ import { AssetRecord, BackgroundSegment, Clip, MusicClip, SubtitleAlignmentInput
 import {
   ACTIVE_PROJECT_ID,
   MIN_CLIP_DURATION,
+  MUSIC_TRACK_ID,
+  SUBTITLE_TRACK_ID,
   TIMELINE_TRACKS,
+  addLibraryMediaToProject,
   applySubtitleAlignmentResult,
+  BACKGROUND_TRACK_ID,
   appendSubtitleCue,
   buildTimelineClips,
   createDefaultBackgroundSegment,
@@ -21,7 +25,9 @@ import {
   createId,
   deleteTimelineClipFromProject,
   getReferencedAssetIds,
+  getRetainedAssetIds,
   normalizeTrackAfterDrag,
+  removeLibraryAsset,
   parseProjectDocument,
   replaceMusicClip,
   sanitizeProjectAgainstMissingAssets,
@@ -61,9 +67,13 @@ type RenderStatusResponse = {
   errorMessage: string | null;
   downloadUrl: string | null;
 };
+type ActiveRenderJob = {
+  statusUrl: string;
+  downloadUrl: string;
+  fileName: string;
+};
 
 const AUDIO_TRACK_ID = 'a1';
-const VIDEO_TRACK_ID = 'v1';
 const TEXT_TRACK_ID = 't1';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -87,6 +97,8 @@ const getTrackMaxEnd = <T extends { start: number; duration: number }>(items: T[
 
 const nowIso = () => new Date().toISOString();
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const ACTIVE_RENDER_JOB_STORAGE_KEY = 'active-render-job';
+const RENDER_STATUS_POLL_MS = 1200;
 
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
@@ -95,6 +107,37 @@ const downloadBlob = (blob: Blob, fileName: string) => {
   anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
+};
+
+const storeActiveRenderJob = (job: ActiveRenderJob | null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (!job) {
+    window.sessionStorage.removeItem(ACTIVE_RENDER_JOB_STORAGE_KEY);
+    return;
+  }
+
+  window.sessionStorage.setItem(ACTIVE_RENDER_JOB_STORAGE_KEY, JSON.stringify(job));
+};
+
+const loadActiveRenderJob = (): ActiveRenderJob | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = window.sessionStorage.getItem(ACTIVE_RENDER_JOB_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as ActiveRenderJob;
+  } catch {
+    window.sessionStorage.removeItem(ACTIVE_RENDER_JOB_STORAGE_KEY);
+    return null;
+  }
 };
 
 const createUploadedAssetRecord = (
@@ -160,24 +203,9 @@ export default function Editor() {
     () => timelineClips.find((clip) => clip.trackId === AUDIO_TRACK_ID) || null,
     [timelineClips],
   );
-  const sortedVisualClips = useMemo(
-    () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === VIDEO_TRACK_ID)),
-    [timelineClips],
-  );
   const sortedTextClips = useMemo(
     () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === TEXT_TRACK_ID)),
     [timelineClips],
-  );
-  const timelineDuration = useMemo(() => {
-    const musicEnd = musicClip ? musicClip.start + musicClip.duration : 0;
-    const visualsEnd = getTrackMaxEnd(sortedVisualClips);
-    const textEnd = getTrackMaxEnd(sortedTextClips);
-    const bgEnd = getTrackMaxEnd(project.background.segments);
-    return Math.max(musicEnd, visualsEnd, textEnd, bgEnd, 1);
-  }, [musicClip, project.background.segments, sortedTextClips, sortedVisualClips]);
-  const activeVisualClip = useMemo(
-    () => findClipAtTime(sortedVisualClips, currentTime),
-    [currentTime, sortedVisualClips],
   );
   const activeTextClip = useMemo(
     () => findClipAtTime(sortedTextClips, currentTime),
@@ -230,12 +258,21 @@ export default function Editor() {
     }
   }, [assetUrls, project]);
 
+  const referencedAssetIdsForGallery = useMemo(() => getReferencedAssetIds(project), [project]);
+  const galleryAssets = useMemo(() => {
+    const ids = new Set<string>([...referencedAssetIdsForGallery, ...project.mediaLibraryAssetIds]);
+    return [...ids]
+      .map((id) => project.assets[id])
+      .filter((a): a is AssetRecord => Boolean(a))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [project, referencedAssetIdsForGallery]);
+
   const persistNow = useCallback(async (nextProject: typeof project, nextAssetBlobs: AssetBlobMap) => {
     try {
       setSaveState('saving');
 
-      const referencedAssetIds = getReferencedAssetIds(nextProject);
-      const nextBlobAssetIds = Object.keys(nextAssetBlobs).filter((assetId) => referencedAssetIds.has(assetId));
+      const retainedAssetIds = getRetainedAssetIds(nextProject);
+      const nextBlobAssetIds = Object.keys(nextAssetBlobs).filter((assetId) => retainedAssetIds.has(assetId));
 
       await persistProject(nextProject);
       await Promise.all(nextBlobAssetIds.map((assetId) => persistAssetBlob(assetId, nextAssetBlobs[assetId])));
@@ -295,6 +332,46 @@ export default function Editor() {
     void persistNow(projectRef.current, assetBlobsRef.current);
   }, [persistNow]);
 
+  const pollRenderJob = useCallback(async (job: ActiveRenderJob) => {
+    setRenderState('rendering');
+    setRenderProgress((current) => Math.max(current, 0.05));
+    setRenderMessage('Waiting for render worker...');
+
+    while (true) {
+      await sleep(RENDER_STATUS_POLL_MS);
+      const statusResponse = await fetch(job.statusUrl, { cache: 'no-store' });
+      if (!statusResponse.ok) {
+        storeActiveRenderJob(null);
+        throw new Error('Lost connection to render job status.');
+      }
+
+      const status = await statusResponse.json() as RenderStatusResponse;
+      setRenderProgress(status.progress);
+      setRenderMessage(status.message);
+
+      if (status.state === 'error') {
+        storeActiveRenderJob(null);
+        throw new Error(status.errorMessage ?? status.message ?? 'Render failed.');
+      }
+
+      if (status.state === 'completed' && status.downloadUrl) {
+        const downloadResponse = await fetch(status.downloadUrl, { cache: 'no-store' });
+        if (!downloadResponse.ok) {
+          storeActiveRenderJob(null);
+          throw new Error('Render finished, but the download could not be retrieved.');
+        }
+
+        const videoBlob = await downloadResponse.blob();
+        downloadBlob(videoBlob, job.fileName);
+        setRenderState('success');
+        setRenderProgress(1);
+        setRenderMessage(`Downloaded ${job.fileName}.`);
+        storeActiveRenderJob(null);
+        return;
+      }
+    }
+  }, []);
+
   const handleNewProject = useCallback(() => {
     if (!window.confirm('Start a new project? The current timeline will be cleared and replaced with a blank project.')) {
       return;
@@ -311,6 +388,7 @@ export default function Editor() {
     setRenderState('idle');
     setRenderProgress(0);
     setRenderMessage(null);
+    storeActiveRenderJob(null);
     void persistNow(nextProject, {});
   }, [persistNow, stopPlayback]);
 
@@ -329,7 +407,7 @@ export default function Editor() {
 
     try {
       setRenderState('rendering');
-      setRenderProgress(0.02);
+      setRenderProgress(0.05);
       setRenderMessage('Preparing render request...');
 
       const formData = new FormData();
@@ -380,45 +458,17 @@ export default function Editor() {
         downloadUrl: string;
       };
 
-      let resolvedDownloadUrl = downloadUrl;
-      while (true) {
-        await sleep(750);
-        const statusResponse = await fetch(statusUrl, { cache: 'no-store' });
-        if (!statusResponse.ok) {
-          throw new Error('Lost connection to render job status.');
-        }
-
-        const status = await statusResponse.json() as RenderStatusResponse;
-        setRenderProgress(status.progress);
-        setRenderMessage(status.message);
-
-        if (status.state === 'error') {
-          throw new Error(status.errorMessage ?? status.message ?? 'Render failed.');
-        }
-
-        if (status.state === 'completed' && status.downloadUrl) {
-          resolvedDownloadUrl = status.downloadUrl;
-          break;
-        }
-      }
-
-      const downloadResponse = await fetch(resolvedDownloadUrl, { cache: 'no-store' });
-      if (!downloadResponse.ok) {
-        throw new Error('Render finished, but the download could not be retrieved.');
-      }
-
-      const videoBlob = await downloadResponse.blob();
       const fileName = `${sanitizeOutputName(currentProject.name)}.mp4`;
-      downloadBlob(videoBlob, fileName);
-      setRenderState('success');
-      setRenderProgress(1);
-      setRenderMessage(`Downloaded ${fileName}.`);
+      const activeJob: ActiveRenderJob = { statusUrl, downloadUrl, fileName };
+      storeActiveRenderJob(activeJob);
+      await pollRenderJob(activeJob);
     } catch (error) {
       setRenderState('error');
       setRenderProgress(0);
       setRenderMessage(error instanceof Error ? error.message : 'Render failed.');
+      storeActiveRenderJob(null);
     }
-  }, [renderState]);
+  }, [pollRenderJob, renderState]);
 
   const handleOpenSubtitleAlignment = useCallback(() => {
     setIsSubtitleAlignmentOpen(true);
@@ -604,6 +654,178 @@ export default function Editor() {
     }
   }, []);
 
+  const handleAddMediaLibraryFiles = useCallback(async (files: FileList | null) => {
+    if (!files?.length) {
+      return;
+    }
+
+    const entries: AssetRecord[] = [];
+    const newBlobs: AssetBlobMap = {};
+
+    for (const file of Array.from(files)) {
+      const isVideo = file.type.startsWith('video/');
+      const isAudio = file.type.startsWith('audio/');
+      const isImage = file.type.startsWith('image/');
+      if (!isVideo && !isAudio && !isImage) {
+        continue;
+      }
+
+      const temporaryUrl = URL.createObjectURL(file);
+
+      try {
+        const assetId = createId();
+        let overrides: Partial<AssetRecord> = {
+          kind: isVideo ? 'video' : isAudio ? 'audio' : 'image',
+        };
+
+        if (isVideo) {
+          const metadata = await getVideoMetadata(temporaryUrl);
+          overrides = {
+            ...overrides,
+            duration: Math.max(metadata.duration, MIN_CLIP_DURATION),
+            width: metadata.width,
+            height: metadata.height,
+          };
+        } else if (isImage) {
+          const metadata = await getImageMetadata(temporaryUrl);
+          overrides = { ...overrides, width: metadata.width, height: metadata.height };
+        } else {
+          const duration = await getAudioDuration(temporaryUrl);
+          overrides = { ...overrides, duration: Math.max(duration, MIN_CLIP_DURATION) };
+        }
+
+        const asset = createUploadedAssetRecord(assetId, file, overrides);
+        entries.push(asset);
+        newBlobs[assetId] = file;
+      } finally {
+        URL.revokeObjectURL(temporaryUrl);
+      }
+    }
+
+    if (entries.length === 0) {
+      return;
+    }
+
+    setProject((current) => addLibraryMediaToProject(current, entries.map((asset) => ({ asset }))));
+    setAssetBlobs((previous) => ({ ...previous, ...newBlobs }));
+  }, []);
+
+  const handleRemoveMediaLibraryAsset = useCallback((assetId: string) => {
+    setProject((current) => {
+      const result = removeLibraryAsset(current, assetId);
+      if ('error' in result) {
+        return current;
+      }
+
+      return result.project;
+    });
+    setAssetBlobs((previous) => {
+      if (!previous[assetId]) {
+        return previous;
+      }
+
+      const next = { ...previous };
+      delete next[assetId];
+      return next;
+    });
+  }, []);
+
+  const handleDropMediaOnTimeline = useCallback(async (payload: { trackId: string; timeSec: number; assetId: string }) => {
+    const { trackId, timeSec, assetId } = payload;
+    const currentProject = projectRef.current;
+    const asset = currentProject.assets[assetId];
+    const blob = assetBlobsRef.current[assetId];
+    if (!asset || !blob) {
+      return;
+    }
+
+    if (trackId === SUBTITLE_TRACK_ID) {
+      return;
+    }
+
+    if (trackId === MUSIC_TRACK_ID) {
+      if (asset.kind !== 'audio') {
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+
+      try {
+        const [duration, waveform, bpm] = await Promise.all([
+          getAudioDuration(url),
+          extractWaveformPeaks(url),
+          estimateBpmFromAudioUrl(url),
+        ]);
+        const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
+        const previousMusicAssetId = currentProject.music.clip?.assetId ?? null;
+        const clipId = createId();
+        const clip: MusicClip = {
+          id: clipId,
+          assetId,
+          name: asset.name,
+          color: '#22c55e',
+          start: 0,
+          duration: safeDuration,
+          sourceDuration: asset.duration ?? safeDuration,
+          trimStart: 0,
+          waveform,
+          bpm: bpm ?? null,
+        };
+
+        stopPlayback();
+        setProject((nextProject) => replaceMusicClip(nextProject, clip, asset));
+        setAssetBlobs((currentBlobs) => {
+          const next = { ...currentBlobs };
+          if (previousMusicAssetId && previousMusicAssetId !== assetId) {
+            delete next[previousMusicAssetId];
+          }
+
+          return next;
+        });
+        setSelectedClipId(clipId);
+        setCurrentTime(0);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+
+      return;
+    }
+
+    if (trackId === BACKGROUND_TRACK_ID) {
+      if (asset.kind !== 'image' && asset.kind !== 'video') {
+        return;
+      }
+
+      const isVideo = asset.kind === 'video';
+      const safeStart = Math.max(0, timeSec);
+      const hasSinglePlaceholder = currentProject.background.segments.length === 1
+        && !currentProject.background.segments[0]?.assetId
+        && currentProject.background.segments[0]?.visualType === 'gradient';
+      const safeSourceDuration = isVideo
+        ? Math.max(asset.duration ?? MIN_CLIP_DURATION, MIN_CLIP_DURATION)
+        : undefined;
+      const segmentId = createId();
+      const segment: BackgroundSegment = {
+        id: segmentId,
+        assetId,
+        name: asset.name,
+        color: isVideo ? '#38bdf8' : '#fb7185',
+        start: safeStart,
+        duration: isVideo
+          ? safeSourceDuration ?? 12
+          : Math.max(currentProject.music.clip?.duration ?? currentProject.background.segments[0]?.duration ?? 12, MIN_CLIP_DURATION),
+        sourceDuration: safeSourceDuration,
+        trimStart: isVideo ? 0 : undefined,
+        visualType: isVideo ? 'video' : 'image',
+        transition: { kind: 'none', duration: 0 },
+        motion: { mode: 'beat-pulse', strength: 0.2 },
+      };
+
+      setProject((nextProject) => upsertBackgroundSegment(nextProject, segment, asset, { replacePlaceholder: hasSinglePlaceholder }));
+      setSelectedClipId(segmentId);
+    }
+  }, [stopPlayback]);
+
   const handleUpdateClip = useCallback((id: string, updates: Partial<Clip>) => {
     setProject((currentProject) => updateTimelineClipInProject(currentProject, id, updates));
   }, []);
@@ -723,7 +945,7 @@ export default function Editor() {
       try {
         const storedProject = await loadPersistedProject(ACTIVE_PROJECT_ID);
         const parsedProject = parseProjectDocument(storedProject ?? createDefaultProject());
-        const storedAssetBlobs = await loadPersistedAssetBlobs(Array.from(getReferencedAssetIds(parsedProject)));
+        const storedAssetBlobs = await loadPersistedAssetBlobs(Array.from(getRetainedAssetIds(parsedProject)));
         const sanitizedProject = sanitizeProjectAgainstMissingAssets(
           parsedProject,
           new Set(Object.keys(storedAssetBlobs)),
@@ -891,6 +1113,19 @@ export default function Editor() {
     };
   }, [assetBlobs, hasHydratedProject, persistNow, project]);
 
+  useEffect(() => {
+    const activeRenderJob = loadActiveRenderJob();
+    if (!activeRenderJob) {
+      return;
+    }
+
+    void pollRenderJob(activeRenderJob).catch((error) => {
+      setRenderState('error');
+      setRenderProgress(0);
+      setRenderMessage(error instanceof Error ? error.message : 'Render failed.');
+    });
+  }, [pollRenderJob]);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-50">
       <TopBar
@@ -924,15 +1159,12 @@ export default function Editor() {
               className="flex min-h-0 flex-col"
             >
               <div className="flex min-h-0 flex-1 overflow-hidden">
-                <PreviewWorkspacePanel
-                  projectName={project.name}
-                  currentTime={currentTime}
-                  timelineDuration={timelineDuration}
-                  bpm={musicClip?.bpm ?? null}
-                  activeVisualName={activeVisualClip?.name ?? null}
-                  subtitleLine={subtitleText}
-                  subtitleCueCount={project.subtitles.cues.length}
-                  backgroundSegmentCount={project.background.segments.length}
+                <MediaGalleryPanel
+                  assets={galleryAssets}
+                  assetUrls={assetUrls}
+                  referencedIds={referencedAssetIdsForGallery}
+                  onAddFiles={handleAddMediaLibraryFiles}
+                  onRemoveAsset={handleRemoveMediaLibraryAsset}
                 />
                 <div className="preview-stage flex min-h-0 min-w-0 flex-1 flex-col bg-zinc-900">
                   <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -975,6 +1207,7 @@ export default function Editor() {
                 beatBpm={musicClip?.bpm ?? null}
                 beatGridStartSec={musicClip?.start ?? 0}
                 subtitleSnapTimes={subtitleSnapTimes}
+                onDropMediaFromGallery={handleDropMediaOnTimeline}
               />
             </ResizablePanel>
           </ResizablePanelGroup>

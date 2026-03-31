@@ -31,9 +31,9 @@ const main = async () => {
         name: 'clip.mp3',
         color: '#22c55e',
         start: 0,
-        duration: 6,
+        duration: 4,
         sourceDuration: 6,
-        trimStart: 0,
+        trimStart: 1,
         waveform: [],
         bpm: 120,
       },
@@ -60,7 +60,7 @@ const main = async () => {
           name: 'Gradient',
           color: '#2563eb',
           start: 0,
-          duration: 6,
+          duration: 4,
           visualType: 'gradient',
           transition: {
             kind: 'fade',
@@ -86,6 +86,7 @@ const main = async () => {
         source: 'upload',
       },
     },
+    mediaLibraryAssetIds: ['audio-1'],
     lyricSync: {
       subtitleAlignment: {
         status: 'idle',
@@ -145,7 +146,9 @@ const main = async () => {
 
   assert.ok(resolvedDownloadUrl, 'Render job never produced a download URL');
   const downloadResponse = await fetch(`http://127.0.0.1:3000${resolvedDownloadUrl}`, { cache: 'no-store' });
-  assert.equal(downloadResponse.status, 200, await downloadResponse.text());
+  if (downloadResponse.status !== 200) {
+    throw new Error(`Download request failed (${downloadResponse.status}): ${await downloadResponse.text()}`);
+  }
   assert.equal(downloadResponse.headers.get('content-type'), 'video/mp4');
   assert.match(
     downloadResponse.headers.get('content-disposition') ?? '',
