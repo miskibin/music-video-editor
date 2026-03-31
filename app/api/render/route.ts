@@ -1,7 +1,5 @@
 import { parseProjectDocument } from '@/lib/project';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { fileURLToPath } from 'node:url';
 import { promises as fs } from 'node:fs';
 import {
   createRenderManifest,
@@ -31,35 +29,6 @@ export const maxDuration = 300;
 
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Render failed.';
 const FILE_CLEANUP_DELAY_MS = 10 * 60 * 1000;
-
-const debugLog = (payload: {
-  runId: string;
-  hypothesisId: string;
-  location: string;
-  message: string;
-  data?: Record<string, unknown>;
-}) => {
-  const line = `${JSON.stringify({
-    sessionId: '35e18a',
-    timestamp: Date.now(),
-    ...payload,
-  })}\n`;
-  // Best-effort local fallback (in case HTTP ingest is unreachable)
-  // #region agent log
-  void fs.appendFile(path.join(process.cwd(), 'debug-35e18a.log'), line, 'utf8').catch(() => {});
-  // #endregion
-  // #region agent log
-  fetch('http://127.0.0.1:7519/ingest/94b95f73-1e6f-469d-99e1-3b8fd84e110f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '35e18a' },
-    body: JSON.stringify({
-      sessionId: '35e18a',
-      timestamp: Date.now(),
-      ...payload,
-    }),
-  }).catch(() => {});
-  // #endregion
-};
 
 const maybePretrimMusicAsset = async (
   jobId: string,
@@ -183,13 +152,6 @@ export async function POST(request: Request) {
   createRenderJobStatus(jobId);
 
   try {
-    debugLog({
-      runId: 'pre-fix',
-      hypothesisId: 'A',
-      location: 'app/api/render/route.ts:POST:job-start',
-      message: 'Render job start',
-      data: { jobId },
-    });
     updateRenderJobStatus(jobId, {
       state: 'staging',
       progress: 0.02,
@@ -213,14 +175,6 @@ export async function POST(request: Request) {
 
     const assetIndexRecord: Record<string, Awaited<ReturnType<typeof stageRenderAsset>>> = {};
     const referencedAssets = getReferencedRenderAssetIds(parsedProject);
-
-    debugLog({
-      runId: 'pre-fix',
-      hypothesisId: 'A',
-      location: 'app/api/render/route.ts:POST:referenced-assets',
-      message: 'Referenced assets computed',
-      data: { jobId, referencedAssetCount: referencedAssets.length, referencedAssets: referencedAssets.slice(0, 30) },
-    });
 
     for (const [index, assetId] of referencedAssets.entries()) {
       updateRenderJobStatus(jobId, {
@@ -246,23 +200,6 @@ export async function POST(request: Request) {
       );
 
       assetIndexRecord[assetId] = stagedAsset;
-
-      const stagedSize = await fs.stat(stagedAsset.filePath).then((s) => s.size).catch(() => null);
-      debugLog({
-        runId: 'pre-fix',
-        hypothesisId: 'A',
-        location: 'app/api/render/route.ts:POST:staged-asset',
-        message: 'Asset staged to disk',
-        data: {
-          jobId,
-          assetId,
-          originalFileName: field.name,
-          stagedFileName: stagedAsset.fileName,
-          stagedFilePath: stagedAsset.filePath,
-          stagedSize,
-          mimeType: stagedAsset.mimeType,
-        },
-      });
     }
 
     updateRenderJobStatus(jobId, {
@@ -275,8 +212,13 @@ export async function POST(request: Request) {
 
     await writeRenderAssetIndex(jobId, assetIndexRecord);
 
-    /** Local file URLs — HTTP asset URLs often hang headless Chromium on Windows (localhost / IPv6). */
+    /** Remotion downloads assets; must use http(s) URLs (file:// is rejected). */
     const assetSources: Record<string, string> = {};
+    const requestOrigin = new URL(request.url).origin;
+    const originUrl = new URL(requestOrigin);
+    // Prefer IPv4 loopback to avoid localhost/IPv6 quirks in headless Chromium on Windows.
+    originUrl.hostname = '127.0.0.1';
+    const assetOrigin = originUrl.toString().replace(/\/$/, '');
     for (const assetId of referencedAssets) {
       const entry = assetIndexRecord[assetId];
       if (!entry) {
@@ -284,40 +226,8 @@ export async function POST(request: Request) {
         await cleanupRenderJob(jobId);
         return Response.json({ detail: `Missing staged asset "${assetId}".` }, { status: 400 });
       }
-      assetSources[assetId] = pathToFileURL(path.resolve(entry.filePath)).href;
+      assetSources[assetId] = `${assetOrigin}/api/render-assets/${encodeURIComponent(jobId)}/${encodeURIComponent(assetId)}`;
     }
-
-    const assetSourceSamples = referencedAssets.slice(0, 20).map((assetId) => ({
-      assetId,
-      href: assetSources[assetId],
-      filePath: (() => {
-        try {
-          return fileURLToPath(assetSources[assetId] ?? '');
-        } catch {
-          return null;
-        }
-      })(),
-    }));
-    const assetExistChecks = await Promise.all(
-      referencedAssets.slice(0, 50).map(async (assetId) => {
-        const href = assetSources[assetId];
-        let filePath: string | null = null;
-        try {
-          filePath = fileURLToPath(href);
-        } catch {
-          return { assetId, href, ok: false, reason: 'fileURLToPath-failed' };
-        }
-        const size = await fs.stat(filePath).then((s) => s.size).catch(() => null);
-        return { assetId, href, filePath, ok: typeof size === 'number' && size > 0, size };
-      }),
-    );
-    debugLog({
-      runId: 'pre-fix',
-      hypothesisId: 'B',
-      location: 'app/api/render/route.ts:POST:asset-sources',
-      message: 'Asset sources built (file://)',
-      data: { jobId, samples: assetSourceSamples, checks: assetExistChecks },
-    });
 
     const manifest = createRenderManifest(parsedProject, assetSources, undefined, {
       audioAlreadyTrimmed,
@@ -333,20 +243,6 @@ export async function POST(request: Request) {
       outputPath: null,
       downloadName,
       errorMessage: null,
-    });
-
-    debugLog({
-      runId: 'pre-fix',
-      hypothesisId: 'C',
-      location: 'app/api/render/route.ts:POST:enqueue',
-      message: 'Job enqueued; starting async render',
-      data: {
-        jobId,
-        outputPath,
-        downloadName,
-        durationInFrames: manifest.durationInFrames,
-        fps: manifest.fps,
-      },
     });
 
     void processRenderJob(jobId, manifest, outputPath, downloadName);
