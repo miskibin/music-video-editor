@@ -48,9 +48,11 @@ import {
   waitForAudioReady,
 } from '@/lib/media-utils';
 import { alignSubtitles } from '@/lib/lyric-sync';
+import { sanitizeOutputName } from '@/lib/render';
 
 type AssetBlobMap = Record<string, Blob>;
 type SaveState = 'loading' | 'saving' | 'saved' | 'error';
+type RenderState = 'idle' | 'rendering' | 'success' | 'error';
 
 const AUDIO_TRACK_ID = 'a1';
 const VIDEO_TRACK_ID = 'v1';
@@ -76,6 +78,15 @@ const getTrackMaxEnd = <T extends { start: number; duration: number }>(items: T[
 );
 
 const nowIso = () => new Date().toISOString();
+
+const downloadBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
 
 const createUploadedAssetRecord = (
   assetId: string,
@@ -106,6 +117,8 @@ export default function Editor() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isSubtitleAlignmentOpen, setIsSubtitleAlignmentOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('loading');
+  const [renderState, setRenderState] = useState<RenderState>('idle');
+  const [renderMessage, setRenderMessage] = useState<string | null>(null);
   const [hasHydratedProject, setHasHydratedProject] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -164,6 +177,10 @@ export default function Editor() {
     () => activeTextClip?.overlayText ?? '',
     [activeTextClip, project.subtitles.sourceText],
   );
+  const subtitleSnapTimes = useMemo(
+    () => project.subtitles.cues.map((cue) => cue.start),
+    [project.subtitles.cues],
+  );
   const subtitleAlignmentInput = useMemo<SubtitleAlignmentInput>(() => {
     if (project.lyricSync.subtitleAlignment.input) {
       return project.lyricSync.subtitleAlignment.input;
@@ -191,6 +208,10 @@ export default function Editor() {
       project.lyricSync.subtitleAlignment.status,
     ],
   );
+  const exportDisabled = useMemo(() => {
+    const musicAssetId = project.music.clip?.assetId;
+    return renderState === 'rendering' || !musicAssetId || !assetBlobs[musicAssetId];
+  }, [assetBlobs, project.music.clip?.assetId, renderState]);
 
   const persistNow = useCallback(async (nextProject: typeof project, nextAssetBlobs: AssetBlobMap) => {
     try {
@@ -256,6 +277,73 @@ export default function Editor() {
   const handleSave = useCallback(() => {
     void persistNow(projectRef.current, assetBlobsRef.current);
   }, [persistNow]);
+
+  const handleExport = useCallback(async () => {
+    if (renderState === 'rendering') {
+      return;
+    }
+
+    const currentProject = projectRef.current;
+    const musicAssetId = currentProject.music.clip?.assetId;
+    if (!musicAssetId) {
+      setRenderState('error');
+      setRenderMessage('Upload music before rendering.');
+      return;
+    }
+
+    try {
+      setRenderState('rendering');
+      setRenderMessage('Preparing render request...');
+
+      const formData = new FormData();
+      formData.append('project', JSON.stringify(currentProject));
+
+      for (const assetId of getReferencedAssetIds(currentProject)) {
+        const assetBlob = assetBlobsRef.current[assetId];
+        const asset = currentProject.assets[assetId];
+
+        if (!assetBlob || !asset) {
+          throw new Error(`Missing local asset data for "${assetId}".`);
+        }
+
+        const file = assetBlob instanceof File
+          ? assetBlob
+          : new File([assetBlob], asset.name, {
+            type: asset.mimeType || assetBlob.type || 'application/octet-stream',
+          });
+
+        formData.append(`asset:${assetId}`, file, asset.name);
+      }
+
+      const response = await fetch('/api/render', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') ?? '';
+        const responseBody = contentType.includes('application/json')
+          ? await response.json()
+          : await response.text();
+        const errorMessage = typeof responseBody === 'object'
+          && responseBody !== null
+          && 'detail' in responseBody
+          ? String((responseBody as { detail: unknown }).detail)
+          : 'Render failed.';
+
+        throw new Error(errorMessage);
+      }
+
+      const videoBlob = await response.blob();
+      const fileName = `${sanitizeOutputName(currentProject.name)}.mp4`;
+      downloadBlob(videoBlob, fileName);
+      setRenderState('success');
+      setRenderMessage(`Downloaded ${fileName}.`);
+    } catch (error) {
+      setRenderState('error');
+      setRenderMessage(error instanceof Error ? error.message : 'Render failed.');
+    }
+  }, [renderState]);
 
   const handleOpenSubtitleAlignment = useCallback(() => {
     setIsSubtitleAlignmentOpen(true);
@@ -734,10 +822,14 @@ export default function Editor() {
         projectName={project.name}
         musicBpm={musicClip?.bpm ?? null}
         saveState={saveState}
+        renderState={renderState}
+        renderMessage={renderMessage}
         onSave={handleSave}
+        onExport={handleExport}
         onOpenSubtitleAlignment={handleOpenSubtitleAlignment}
         subtitleAlignmentStatus={project.lyricSync.subtitleAlignment.status}
         subtitleAlignmentDisabled={!musicClip?.assetUrl || project.lyricSync.subtitleAlignment.status === 'running'}
+        exportDisabled={exportDisabled}
       />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -808,6 +900,7 @@ export default function Editor() {
                 onStepTime={handleStepTime}
                 beatBpm={musicClip?.bpm ?? null}
                 beatGridStartSec={musicClip?.start ?? 0}
+                subtitleSnapTimes={subtitleSnapTimes}
               />
             </ResizablePanel>
           </ResizablePanelGroup>

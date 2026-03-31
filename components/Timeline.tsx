@@ -1,9 +1,14 @@
 'use client';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import TimelineTrack from './TimelineTrack';
 import { Trash2, Magnet, Pause, Play, SkipBack, SkipForward, Square, Volume2, Maximize2 } from 'lucide-react';
 import { Clip, Track } from '@/lib/types';
-import { PIXELS_PER_SECOND } from '@/lib/constants';
+import {
+  PIXELS_PER_SECOND,
+  TIMELINE_ABOVE_TRACKS_CHROME_PX,
+  TIMELINE_TRACK_HEIGHT_MAX,
+  TIMELINE_TRACK_HEIGHT_MIN,
+} from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
@@ -29,6 +34,8 @@ interface Props {
   beatBpm?: number | null;
   /** Timeline time (seconds) where bar 0 aligns (music clip start). */
   beatGridStartSec?: number;
+  /** Subtitle cue start times (seconds) for snapping. */
+  subtitleSnapTimes?: readonly number[];
 }
 
 const EMPTY_CLIPS: Clip[] = [];
@@ -51,9 +58,12 @@ export default function Timeline({
   onStepTime,
   beatBpm = null,
   beatGridStartSec = 0,
+  subtitleSnapTimes = [],
 }: Props) {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [zoom, setZoom] = useState(1);
+  const [trackAreaHeight, setTrackAreaHeight] = useState(0);
+  const timelineRootRef = useRef<HTMLDivElement>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -110,6 +120,62 @@ export default function Timeline({
     }
     return out;
   }, [beatBpm, beatGridStartSec, timelineDuration]);
+
+  const snapPoints = useMemo(() => {
+    const merged: number[] = [0];
+    merged.push(...beatTimes);
+    merged.push(...subtitleSnapTimes);
+    for (const c of clips) {
+      merged.push(c.start, c.start + c.duration);
+    }
+    return [...new Set(merged.map((t) => Math.round(t * 1000) / 1000))]
+      .filter((t) => t >= 0 && t <= timelineDuration)
+      .sort((a, b) => a - b);
+  }, [beatTimes, clips, subtitleSnapTimes, timelineDuration]);
+
+  const trackRowHeight = useMemo(() => {
+    if (tracks.length === 0) {
+      return TIMELINE_TRACK_HEIGHT_MIN;
+    }
+    const share = trackAreaHeight / tracks.length;
+    return Math.min(TIMELINE_TRACK_HEIGHT_MAX, Math.max(TIMELINE_TRACK_HEIGHT_MIN, share));
+  }, [trackAreaHeight, tracks.length]);
+
+  useLayoutEffect(() => {
+    const root = timelineRootRef.current;
+    if (!root) {
+      return;
+    }
+
+    let rafId = 0;
+
+    const measure = () => {
+      const next = Math.max(0, root.clientHeight - TIMELINE_ABOVE_TRACKS_CHROME_PX);
+      setTrackAreaHeight(next);
+    };
+
+    /** Debounce / coalesce ResizeObserver (fires many times while dragging the splitter) to one read per frame. */
+    const scheduleMeasure = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        measure();
+      });
+    };
+
+    scheduleMeasure();
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(root);
+
+    return () => {
+      observer.disconnect();
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, []);
   const playheadStyle = useMemo(
     () => ({ left: `${currentTime * pixelsPerSecond}px` }),
     [currentTime, pixelsPerSecond],
@@ -191,7 +257,11 @@ export default function Timeline({
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 select-none" onClick={handleClearSelection}>
+    <div
+      ref={timelineRootRef}
+      className="flex min-h-0 flex-col h-full bg-zinc-950 select-none"
+      onClick={handleClearSelection}
+    >
       <div className="h-10 border-b border-zinc-800 flex items-center justify-between px-4 shrink-0 bg-zinc-900" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1 flex-1">
           <Tooltip>
@@ -227,7 +297,7 @@ export default function Timeline({
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-zinc-800 text-zinc-100 border-zinc-700">
-              <p>Toggle Snapping</p>
+              <p>Snapping (bars, subtitles, clip edges)</p>
             </TooltipContent>
           </Tooltip>
         </div>
@@ -310,11 +380,11 @@ export default function Timeline({
         </div>
       </div>
 
-        <div
-          ref={containerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto overflow-x-auto relative [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-zinc-950 [&::-webkit-scrollbar-thumb]:bg-zinc-800 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-zinc-700"
-        >
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-auto relative [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-zinc-950 [&::-webkit-scrollbar-thumb]:bg-zinc-800 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-zinc-700"
+      >
         <div className="absolute top-0 bottom-0 w-px bg-red-500 z-30 pointer-events-none" style={trackPlayheadStyle} />
 
         <div className="relative w-max min-w-full">
@@ -337,10 +407,13 @@ export default function Timeline({
             <TimelineTrack
               key={track.id}
               track={track}
+              trackRowHeight={trackRowHeight}
               width={timelineWidth}
               clips={clipsByTrack.get(track.id) || EMPTY_CLIPS}
               selectedClipId={selectedClipId}
               pixelsPerSecond={pixelsPerSecond}
+              snapEnabled={snapEnabled}
+              snapPoints={snapPoints}
               onSelectClip={onSelectClip}
               onChangeClip={onChangeClip}
               onDragEnd={onDragEnd}

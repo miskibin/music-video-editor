@@ -1,6 +1,8 @@
 'use client';
 import React from 'react';
 import { Clip } from '@/lib/types';
+import { TIMELINE_SNAP_THRESHOLD_PX } from '@/lib/constants';
+import { snapNearestTime } from '@/lib/timeline-snap';
 
 type DragAction = 'move' | 'resize-left' | 'resize-right';
 
@@ -98,10 +100,67 @@ const getDraftClipPosition = (
   };
 };
 
+const applySnapToDraft = (
+  draft: DraftClipPosition,
+  action: DragAction,
+  snapEnabled: boolean,
+  snapPoints: readonly number[],
+  pixelsPerSecond: number,
+  isAudioClip: boolean,
+  sourceDuration: number,
+): DraftClipPosition => {
+  if (!snapEnabled || snapPoints.length === 0) {
+    return draft;
+  }
+
+  const thresholdSec = TIMELINE_SNAP_THRESHOLD_PX / pixelsPerSecond;
+  const snap = (t: number) => snapNearestTime(t, snapPoints, thresholdSec);
+
+  if (action === 'move') {
+    return { ...draft, start: snap(draft.start) };
+  }
+
+  if (action === 'resize-right') {
+    const end = draft.start + draft.duration;
+    const snappedEnd = snap(end);
+    return { ...draft, duration: Math.max(MIN_CLIP_DURATION, snappedEnd - draft.start) };
+  }
+
+  if (action === 'resize-left') {
+    const snappedStart = snap(draft.start);
+    const delta = snappedStart - draft.start;
+    if (Math.abs(delta) < 1e-9) {
+      return draft;
+    }
+
+    if (isAudioClip) {
+      const nextTrim = (draft.trimStart ?? 0) + delta;
+      const maxTrim = Math.max(0, sourceDuration - draft.duration);
+      if (nextTrim < 0 || nextTrim > maxTrim + 1e-6) {
+        return draft;
+      }
+
+      return { ...draft, start: snappedStart, trimStart: nextTrim, duration: draft.duration };
+    }
+
+    const end = draft.start + draft.duration;
+    const nextDur = end - snappedStart;
+    if (nextDur < MIN_CLIP_DURATION) {
+      return draft;
+    }
+
+    return { ...draft, start: snappedStart, duration: nextDur };
+  }
+
+  return draft;
+};
+
 interface Props {
   clip: Clip;
   selected: boolean;
   pixelsPerSecond: number;
+  snapEnabled: boolean;
+  snapPoints: readonly number[];
   onSelect: (id: string) => void;
   onChange: (id: string, updates: Partial<Clip>) => void;
   onDragEnd: (id: string) => void;
@@ -111,6 +170,8 @@ function TimelineClip({
   clip,
   selected,
   pixelsPerSecond,
+  snapEnabled,
+  snapPoints,
   onSelect,
   onChange,
   onDragEnd,
@@ -131,11 +192,20 @@ function TimelineClip({
       return;
     }
 
-    const nextPosition = getDraftClipPosition(
+    const raw = getDraftClipPosition(
       dragState,
       pixelsPerSecond,
       dragState.latestClientX,
       dragState.startX,
+    );
+    const nextPosition = applySnapToDraft(
+      raw,
+      dragState.action,
+      snapEnabled,
+      snapPoints,
+      pixelsPerSecond,
+      isAudioClip,
+      clip.sourceDuration ?? clip.duration,
     );
 
     setDraftClipPosition((currentDraft) => {
@@ -150,7 +220,7 @@ function TimelineClip({
 
       return nextPosition;
     });
-  }, [pixelsPerSecond]);
+  }, [clip.duration, clip.sourceDuration, isAudioClip, pixelsPerSecond, snapEnabled, snapPoints]);
 
   const handlePointerDown = React.useCallback((e: React.PointerEvent<HTMLDivElement>, action: DragAction) => {
     e.stopPropagation();
@@ -200,11 +270,20 @@ function TimelineClip({
         frameRef.current = null;
       }
 
-      const nextPosition = getDraftClipPosition(
+      const raw = getDraftClipPosition(
         dragState,
         pixelsPerSecond,
         upEvent.clientX,
         dragState.startX,
+      );
+      const nextPosition = applySnapToDraft(
+        raw,
+        dragState.action,
+        snapEnabled,
+        snapPoints,
+        pixelsPerSecond,
+        isAudioClip,
+        clip.sourceDuration ?? clip.duration,
       );
 
       dragState.target.releasePointerCapture(dragState.pointerId);
@@ -245,6 +324,8 @@ function TimelineClip({
     onDragEnd,
     onSelect,
     pixelsPerSecond,
+    snapEnabled,
+    snapPoints,
     updateDraftPosition,
   ]);
 
@@ -333,6 +414,8 @@ function areClipPropsEqual(previous: Props, next: Props) {
   return previous.clip === next.clip
     && previous.selected === next.selected
     && previous.pixelsPerSecond === next.pixelsPerSecond
+    && previous.snapEnabled === next.snapEnabled
+    && previous.snapPoints === next.snapPoints
     && previous.onSelect === next.onSelect
     && previous.onChange === next.onChange
     && previous.onDragEnd === next.onDragEnd;

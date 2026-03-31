@@ -20,10 +20,13 @@ const GRID_STYLE = {
 
 interface Props {
   track: Track;
+  trackRowHeight: number;
   width: number;
   clips: Clip[];
   selectedClipId: string | null;
   pixelsPerSecond: number;
+  snapEnabled: boolean;
+  snapPoints: readonly number[];
   onSelectClip: (id: string | null) => void;
   onChangeClip: (id: string, updates: Partial<Clip>) => void;
   onDragEnd: (id: string) => void;
@@ -31,19 +34,23 @@ interface Props {
 
 function TimelineTrack({
   track,
+  trackRowHeight,
   width,
   clips,
   selectedClipId,
   pixelsPerSecond,
+  snapEnabled,
+  snapPoints,
   onSelectClip,
   onChangeClip,
   onDragEnd,
 }: Props) {
   const Icon = ICONS[track.type];
   const contentStyle = React.useMemo(() => ({ minWidth: `${width}px` }), [width]);
+  const rowStyle = React.useMemo(() => ({ height: trackRowHeight, minHeight: trackRowHeight }), [trackRowHeight]);
 
   return (
-    <div className="flex h-12 border-b border-zinc-800/50 group w-max min-w-full">
+    <div className="flex border-b border-zinc-800/50 group w-max min-w-full" style={rowStyle}>
       <div className="w-40 shrink-0 bg-zinc-900 border-r border-zinc-800 flex items-center justify-between px-3 sticky left-0 z-40">
         <div className="flex items-center gap-2 text-zinc-400">
           <Icon className="w-3.5 h-3.5" />
@@ -67,6 +74,8 @@ function TimelineTrack({
             clip={clip}
             selected={clip.id === selectedClipId}
             pixelsPerSecond={pixelsPerSecond}
+            snapEnabled={snapEnabled}
+            snapPoints={snapPoints}
             onSelect={onSelectClip}
             onChange={onChangeClip}
             onDragEnd={onDragEnd}
@@ -79,10 +88,13 @@ function TimelineTrack({
 
 function areTrackPropsEqual(previous: Props, next: Props) {
   return previous.track === next.track
+    && previous.trackRowHeight === next.trackRowHeight
     && previous.width === next.width
     && previous.clips === next.clips
     && previous.selectedClipId === next.selectedClipId
     && previous.pixelsPerSecond === next.pixelsPerSecond
+    && previous.snapEnabled === next.snapEnabled
+    && previous.snapPoints === next.snapPoints
     && previous.onSelectClip === next.onSelectClip
     && previous.onChangeClip === next.onChangeClip
     && previous.onDragEnd === next.onDragEnd;

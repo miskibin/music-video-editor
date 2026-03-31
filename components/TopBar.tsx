@@ -10,20 +10,28 @@ interface Props {
   projectName: string;
   musicBpm: number | null;
   saveState: SaveState;
+  renderState: 'idle' | 'rendering' | 'success' | 'error';
+  renderMessage: string | null;
   onSave: () => void;
+  onExport: () => void;
   onOpenSubtitleAlignment: () => void;
   subtitleAlignmentStatus: SubtitleAlignmentStatus;
   subtitleAlignmentDisabled: boolean;
+  exportDisabled: boolean;
 }
 
 function TopBar({
   projectName,
   musicBpm,
   saveState,
+  renderState,
+  renderMessage,
   onSave,
+  onExport,
   onOpenSubtitleAlignment,
   subtitleAlignmentStatus,
   subtitleAlignmentDisabled,
+  exportDisabled,
 }: Props) {
   const saveLabel = saveState === 'loading'
     ? 'Loading'
@@ -39,6 +47,8 @@ function TopBar({
       : subtitleAlignmentStatus === 'applied'
         ? 'Re-run Lyric Sync'
         : 'Run Lyric Sync';
+  const exportLabel = renderState === 'rendering' ? 'Rendering MP4' : 'Export MP4';
+  const exportTone = renderState === 'error' ? 'text-rose-300' : 'text-zinc-400';
 
   return (
     <header className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
@@ -61,6 +71,11 @@ function TopBar({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {renderMessage ? (
+          <span className={`hidden text-xs md:inline ${exportTone}`}>
+            {renderMessage}
+          </span>
+        ) : null}
         <Button
           variant="ghost"
           size="sm"
@@ -84,9 +99,14 @@ function TopBar({
           <Save className="w-4 h-4 mr-2" />
           {saveLabel}
         </Button>
-        <Button size="sm" disabled className="bg-white text-black hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed">
+        <Button
+          size="sm"
+          onClick={onExport}
+          disabled={exportDisabled}
+          className="bg-white text-black hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
           <Download className="w-4 h-4 mr-2" />
-          Export
+          {exportLabel}
         </Button>
       </div>
     </header>
