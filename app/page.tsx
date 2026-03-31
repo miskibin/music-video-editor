@@ -1203,6 +1203,7 @@ export default function Editor() {
                       manifest={renderPreviewManifest}
                       subtitleStyle={project.subtitles.subtitleStyle}
                       onSubtitleStyleChange={handleSubtitleStyleChange}
+                      showSubtitleOverlay={selectedClip?.trackId === SUBTITLE_TRACK_ID}
                     />
                   </div>
                 </div>

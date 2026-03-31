@@ -8,6 +8,8 @@ interface Props {
   manifest: RenderManifest | null;
   subtitleStyle: SubtitleStyle;
   onSubtitleStyleChange: (updates: Partial<SubtitleStyle>) => void;
+  /** Show draggable subtitle layout overlay (e.g. when a subtitle cue is selected). */
+  showSubtitleOverlay?: boolean;
 }
 
 const VideoPreviewPlayer = dynamic(() => import('@/components/VideoPreviewPlayer'), {
@@ -22,6 +24,7 @@ export default function VideoPreview({
   manifest,
   subtitleStyle,
   onSubtitleStyleChange,
+  showSubtitleOverlay = false,
 }: Props) {
   return (
     <div className="flex items-center justify-center w-full h-full min-h-0">
@@ -30,6 +33,7 @@ export default function VideoPreview({
         <SubtitleLayoutOverlay
           subtitleStyle={subtitleStyle}
           onSubtitleStyleChange={onSubtitleStyleChange}
+          enabled={showSubtitleOverlay}
         />
       </div>
     </div>

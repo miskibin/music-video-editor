@@ -144,7 +144,7 @@ export function SubtitleLayoutOverlay({
           role="presentation"
           onPointerDown={startMove}
           className={`relative w-full rounded-md border-2 border-dashed border-emerald-400/90 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.35)] ${
-            enabled ? 'cursor-ns-resize active:cursor-grabbing' : 'cursor-default opacity-60'
+            enabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-60'
           }`}
         >
           <span className="pointer-events-none absolute -top-7 left-1/2 max-w-[calc(100%-8px)] -translate-x-1/2 text-center text-[10px] font-medium uppercase tracking-wide text-emerald-400/90">
