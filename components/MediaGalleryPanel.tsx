@@ -19,10 +19,12 @@ import type { AssetRecord } from '@/lib/types';
 import { setMediaGalleryDragData } from '@/lib/media-drag';
 import {
   type StockSearchItem,
-  fetchStockImageBlob,
+  fetchStockMediaBlob,
   searchPexelsStock,
   searchPixabayStock,
 } from '@/lib/stock-client';
+
+type MediaKindFilter = 'all' | 'photo' | 'video';
 
 const PEXELS_KEY_STORAGE = 'mve_pexels_api_key';
 const PIXABAY_KEY_STORAGE = 'mve_pixabay_api_key';
@@ -33,6 +35,64 @@ const PIXABAY_API_DOCS_URL = 'https://pixabay.com/api/docs/';
 const PIXABAY_ACCOUNT_URL = 'https://pixabay.com/accounts/edit/';
 
 const MAX_SEARCH_RESULTS = 10;
+
+/** Muted hover preview: shows a decoded frame on load, plays while pointer is over the tile. */
+function GalleryVideoPreview({
+  src,
+  poster,
+  className,
+}: {
+  src: string;
+  poster?: string | null;
+  className?: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      poster={poster ?? undefined}
+      muted
+      playsInline
+      loop
+      preload="metadata"
+      controls={false}
+      disablePictureInPicture
+      className={className}
+      aria-label="Video preview"
+      onMouseEnter={() => {
+        void videoRef.current?.play().catch(() => {});
+      }}
+      onMouseLeave={() => {
+        const el = videoRef.current;
+        if (!el) {
+          return;
+        }
+        el.pause();
+        try {
+          if (el.duration > 0 && !Number.isNaN(el.duration)) {
+            el.currentTime = Math.min(0.04, el.duration * 0.002);
+          } else {
+            el.currentTime = 0;
+          }
+        } catch {
+          el.currentTime = 0;
+        }
+      }}
+      onLoadedMetadata={(e) => {
+        const el = e.currentTarget;
+        try {
+          if (el.duration > 0 && !Number.isNaN(el.duration)) {
+            el.currentTime = Math.min(0.04, el.duration * 0.002);
+          }
+        } catch {
+          /* ignore seek errors */
+        }
+      }}
+    />
+  );
+}
 
 function readStockKeys(): { pexels: string | null; pixabay: string | null } {
   if (typeof window === 'undefined') {
@@ -55,13 +115,23 @@ function localMatchRank(name: string, ql: string): number {
   return 2;
 }
 
-function filterLocalAssets(assets: AssetRecord[], q: string): AssetRecord[] {
+function matchesMediaFilter(asset: AssetRecord, filter: MediaKindFilter): boolean {
+  if (filter === 'all') {
+    return true;
+  }
+  if (filter === 'photo') {
+    return asset.kind === 'image';
+  }
+  return asset.kind === 'video';
+}
+
+function filterLocalAssets(assets: AssetRecord[], q: string, filter: MediaKindFilter): AssetRecord[] {
   const ql = q.trim().toLowerCase();
   if (!ql) {
     return [];
   }
   return assets
-    .filter((a) => a.name.toLowerCase().includes(ql))
+    .filter((a) => a.name.toLowerCase().includes(ql) && matchesMediaFilter(a, filter))
     .sort((a, b) => localMatchRank(b.name, ql) - localMatchRank(a.name, ql))
     .slice(0, MAX_SEARCH_RESULTS);
 }
@@ -86,6 +156,7 @@ function MediaGalleryPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [searchInput, setSearchInput] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [mediaFilter, setMediaFilter] = useState<MediaKindFilter>('all');
   const [keysTick, setKeysTick] = useState(0);
   const [apiDialogOpen, setApiDialogOpen] = useState(false);
   const [pexelsDraft, setPexelsDraft] = useState('');
@@ -130,7 +201,7 @@ function MediaGalleryPanel({
     setStockHits([]);
     setSearchLoading(true);
 
-    const local = filterLocalAssets(assets, debouncedQuery);
+    const local = filterLocalAssets(assets, debouncedQuery, mediaFilter);
     const need = MAX_SEARCH_RESULTS - local.length;
     const { pexels: pexelsKey, pixabay: pixabayKey } = readStockKeys();
 
@@ -148,21 +219,52 @@ function MediaGalleryPanel({
       return;
     }
 
+    const buildSplitTasks = (
+      slotNeed: number,
+      mode: 'photo' | 'video',
+    ): Promise<StockSearchItem[]>[] => {
+      const tasks: Promise<StockSearchItem[]>[] = [];
+      if (slotNeed <= 0 || (!pexelsKey && !pixabayKey)) {
+        return tasks;
+      }
+      if (pexelsKey) {
+        const n = pixabayKey ? Math.ceil(slotNeed / 2) : slotNeed;
+        tasks.push(
+          searchPexelsStock(pexelsKey, debouncedQuery, 1, Math.max(3, n), mode).then((r) => r.slice(0, n)),
+        );
+      }
+      if (pixabayKey) {
+        const n = pexelsKey ? Math.floor(slotNeed / 2) : slotNeed;
+        tasks.push(
+          searchPixabayStock(pixabayKey, debouncedQuery, 1, Math.max(3, n), mode).then((r) => r.slice(0, n)),
+        );
+      }
+      return tasks;
+    };
+
     (async () => {
       let stock: StockSearchItem[] = [];
       try {
-        const tasks: Promise<StockSearchItem[]>[] = [];
-        if (pexelsKey) {
-          const n = pixabayKey ? Math.ceil(need / 2) : need;
-          tasks.push(searchPexelsStock(pexelsKey, debouncedQuery, 1, Math.max(3, n)).then((r) => r.slice(0, n)));
-        }
-        if (pixabayKey) {
-          const n = pexelsKey ? Math.floor(need / 2) : need;
-          tasks.push(searchPixabayStock(pixabayKey, debouncedQuery, 1, Math.max(3, n)).then((r) => r.slice(0, n)));
-        }
-        if (tasks.length > 0) {
-          const parts = await Promise.all(tasks);
-          stock = parts.flat().slice(0, need);
+        if (mediaFilter === 'photo') {
+          const tasks = buildSplitTasks(need, 'photo');
+          if (tasks.length > 0) {
+            stock = (await Promise.all(tasks)).flat().slice(0, need);
+          }
+        } else if (mediaFilter === 'video') {
+          const tasks = buildSplitTasks(need, 'video');
+          if (tasks.length > 0) {
+            stock = (await Promise.all(tasks)).flat().slice(0, need);
+          }
+        } else {
+          const photoNeed = Math.ceil(need / 2);
+          const videoNeed = Math.floor(need / 2);
+          const photoTasks = buildSplitTasks(photoNeed, 'photo');
+          const videoTasks = buildSplitTasks(videoNeed, 'video');
+          const [photoStock, videoStock] = await Promise.all([
+            photoTasks.length ? Promise.all(photoTasks).then((parts) => parts.flat()) : Promise.resolve([]),
+            videoTasks.length ? Promise.all(videoTasks).then((parts) => parts.flat()) : Promise.resolve([]),
+          ]);
+          stock = [...photoStock, ...videoStock].slice(0, need);
         }
       } catch (e) {
         if (!cancelled) {
@@ -184,10 +286,17 @@ function MediaGalleryPanel({
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, assets, keysTick]);
+  }, [debouncedQuery, assets, keysTick, mediaFilter]);
 
   const browseMode = !debouncedQuery;
   const totalHits = localHits.length + stockHits.length;
+
+  const browseAssets = useMemo(() => {
+    if (mediaFilter === 'all') {
+      return assets;
+    }
+    return assets.filter((a) => matchesMediaFilter(a, mediaFilter));
+  }, [assets, mediaFilter]);
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,10 +340,18 @@ function MediaGalleryPanel({
       setImportingStockId(item.id);
       setSearchError(null);
       try {
-        const blob = await fetchStockImageBlob(item.downloadUrl);
-        const ext = blob.type.includes('png') ? 'png' : 'jpg';
+        const blob = await fetchStockMediaBlob(item.downloadUrl);
+        const isVideo = item.kind === 'video';
+        const ext = isVideo
+          ? blob.type.includes('webm')
+            ? 'webm'
+            : 'mp4'
+          : blob.type.includes('png')
+            ? 'png'
+            : 'jpg';
         const safeName = `${item.source}-${item.id.replace(/[^a-zA-Z0-9_-]/g, '')}.${ext}`;
-        const file = new File([blob], safeName, { type: blob.type || 'image/jpeg' });
+        const mime = blob.type || (isVideo ? 'video/mp4' : 'image/jpeg');
+        const file = new File([blob], safeName, { type: mime });
         await Promise.resolve(onImportStockImage(file));
         setSearchInput('');
         setDebouncedQuery('');
@@ -271,7 +388,7 @@ function MediaGalleryPanel({
             <Image src={url} alt={asset.name} fill unoptimized className="object-cover" />
           ) : null}
           {asset.kind === 'video' && url ? (
-            <video src={url} muted playsInline className="absolute inset-0 h-full w-full object-cover" />
+            <GalleryVideoPreview src={url} className="absolute inset-0 h-full w-full object-cover" />
           ) : null}
           {asset.kind === 'audio' ? (
             <div className="flex h-full w-full items-center justify-center bg-zinc-900">
@@ -375,12 +492,32 @@ function MediaGalleryPanel({
             aria-label="Search media library and stock"
           />
         </div>
+        <div className="flex gap-1" role="group" aria-label="Filter by media type">
+          {(
+            [
+              { id: 'all' as const, label: 'All' },
+              { id: 'photo' as const, label: 'Photos' },
+              { id: 'video' as const, label: 'Videos' },
+            ] as const
+          ).map(({ id, label }) => (
+            <Button
+              key={id}
+              type="button"
+              variant={mediaFilter === id ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 min-w-0 flex-1 px-1.5 text-[10px] font-medium"
+              onClick={() => setMediaFilter(id)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <Dialog open={apiDialogOpen} onOpenChange={setApiDialogOpen}>
         <DialogContent className="border-zinc-700 bg-zinc-950 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100">Stock photo search</DialogTitle>
+            <DialogTitle className="text-zinc-100">Stock media (Pexels & Pixabay)</DialogTitle>
             <DialogDescription className="text-zinc-500">
               Optional keys for Pexels and Pixabay. They are stored only in this browser. Paste a new key to replace an
               existing one; saved keys are never shown again after you close this dialog.
@@ -482,8 +619,16 @@ function MediaGalleryPanel({
             <p className="col-span-2 px-1 py-4 text-center text-xs text-zinc-500">
               No files yet. Add images, video, or audio — they stay here until you use them on the timeline.
             </p>
+          ) : browseAssets.length === 0 ? (
+            <p className="col-span-2 px-1 py-4 text-center text-xs text-zinc-500">
+              {mediaFilter === 'photo'
+                ? 'No photos in the library. Change the filter or add images.'
+                : mediaFilter === 'video'
+                  ? 'No videos in the library. Change the filter or add video files.'
+                  : 'Nothing matches this filter.'}
+            </p>
           ) : (
-            assets.map((asset) => renderAssetCard(asset))
+            browseAssets.map((asset) => renderAssetCard(asset))
           )
         ) : searchLoading && totalHits === 0 ? (
           <p className="col-span-2 flex items-center justify-center gap-2 py-10 text-xs text-zinc-500">
@@ -504,12 +649,18 @@ function MediaGalleryPanel({
                 className="flex flex-col overflow-hidden rounded-lg border border-zinc-800/80 bg-zinc-900/40"
               >
                 <div className="relative aspect-video w-full bg-black">
-                  {item.previewUrl ? (
+                  {item.kind === 'video' && item.downloadUrl ? (
+                    <GalleryVideoPreview
+                      src={item.downloadUrl}
+                      poster={item.previewUrl || null}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : item.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- remote stock thumbnails
                     <img src={item.previewUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   ) : null}
-                  <span className="absolute right-1 top-1 rounded bg-zinc-950/90 px-1.5 py-0.5 text-[9px] font-medium uppercase text-zinc-300">
-                    {item.source}
+                  <span className="pointer-events-none absolute right-1 top-1 rounded bg-zinc-950/90 px-1.5 py-0.5 text-[9px] font-medium uppercase text-zinc-300">
+                    {item.source} · {item.kind}
                   </span>
                 </div>
                 <div className="space-y-1 border-t border-zinc-800/60 p-1.5">

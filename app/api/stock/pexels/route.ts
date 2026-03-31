@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === 'video') {
-    const url = new URL('https://api.pexels.com/videos/search');
+    const url = new URL('https://api.pexels.com/v1/videos/search');
     url.searchParams.set('query', query);
     url.searchParams.set('per_page', String(perPage));
     url.searchParams.set('page', String(page));
@@ -61,19 +61,21 @@ export async function POST(req: NextRequest) {
       }>;
     };
 
-    const items = (data.videos ?? []).map((v) => {
-      const downloadUrl = pickBestPexelsVideoLink(v.video_files ?? []);
-      return {
-        id: `pexels-v-${v.id}`,
-        source: 'pexels' as const,
-        kind: 'video' as const,
-        previewUrl: v.image ?? '',
-        downloadUrl,
-        width: v.width,
-        height: v.height,
-        attribution: v.user?.name ? `Video by ${v.user.name} (Pexels)` : 'Pexels',
-      };
-    });
+    const items = (data.videos ?? [])
+      .map((v) => {
+        const downloadUrl = pickBestPexelsVideoLink(v.video_files ?? []);
+        return {
+          id: `pexels-v-${v.id}`,
+          source: 'pexels' as const,
+          kind: 'video' as const,
+          previewUrl: v.image ?? '',
+          downloadUrl,
+          width: v.width,
+          height: v.height,
+          attribution: v.user?.name ? `Video by ${v.user.name} (Pexels)` : 'Pexels',
+        };
+      })
+      .filter((item) => Boolean(item.downloadUrl));
 
     return NextResponse.json({ items });
   }

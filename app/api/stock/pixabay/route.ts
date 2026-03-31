@@ -57,24 +57,27 @@ export async function POST(req: NextRequest) {
       }>;
     };
 
-    const items = (data.hits ?? []).map((h) => {
-      const large = h.videos?.large;
-      const medium = h.videos?.medium;
-      const downloadUrl = large?.url ?? medium?.url ?? h.videos?.small?.url ?? '';
-      const previewUrl = h.previewURL ?? '';
-      const width = large?.width ?? h.imageWidth ?? 0;
-      const height = large?.height ?? h.imageHeight ?? 0;
-      return {
-        id: `pixabay-v-${h.id}`,
-        source: 'pixabay' as const,
-        kind: 'video' as const,
-        previewUrl,
-        downloadUrl,
-        width,
-        height,
-        attribution: h.user ? `Video by ${h.user} (Pixabay)` : 'Pixabay',
-      };
-    });
+    const items = (data.hits ?? [])
+      .map((h) => {
+        const large = h.videos?.large;
+        const medium = h.videos?.medium;
+        const downloadUrl = large?.url ?? medium?.url ?? h.videos?.small?.url ?? '';
+        const previewUrl =
+          h.previewURL ?? h.videos?.tiny?.url ?? h.videos?.small?.url ?? medium?.url ?? '';
+        const width = large?.width ?? h.imageWidth ?? 0;
+        const height = large?.height ?? h.imageHeight ?? 0;
+        return {
+          id: `pixabay-v-${h.id}`,
+          source: 'pixabay' as const,
+          kind: 'video' as const,
+          previewUrl,
+          downloadUrl,
+          width,
+          height,
+          attribution: h.user ? `Video by ${h.user} (Pixabay)` : 'Pixabay',
+        };
+      })
+      .filter((item) => Boolean(item.downloadUrl));
 
     return NextResponse.json({ items });
   }

@@ -13,6 +13,17 @@ const debugLog = (payload: {
   message: string;
   data?: Record<string, unknown>;
 }) => {
+  const line = `${JSON.stringify({
+    sessionId: '35e18a',
+    timestamp: Date.now(),
+    ...payload,
+  })}\n`;
+  // Best-effort local fallback (in case HTTP ingest is unreachable)
+  // #region agent log
+  void import('node:fs/promises')
+    .then((m) => m.appendFile(path.join(process.cwd(), 'debug-35e18a.log'), line, 'utf8'))
+    .catch(() => {});
+  // #endregion
   // #region agent log
   fetch('http://127.0.0.1:7519/ingest/94b95f73-1e6f-469d-99e1-3b8fd84e110f', {
     method: 'POST',

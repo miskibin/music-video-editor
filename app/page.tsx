@@ -730,7 +730,9 @@ export default function Editor() {
   }, []);
 
   const handleImportStockImage = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
       return;
     }
 
@@ -738,15 +740,26 @@ export default function Editor() {
 
     try {
       const assetId = createId();
-      const metadata = await getImageMetadata(temporaryUrl);
-      const asset = createUploadedAssetRecord(assetId, file, {
-        kind: 'image',
-        width: metadata.width,
-        height: metadata.height,
-      });
-
-      setProject((current) => addLibraryMediaToProject(current, [{ asset }]));
-      setAssetBlobs((previous) => ({ ...previous, [assetId]: file }));
+      if (isImage) {
+        const metadata = await getImageMetadata(temporaryUrl);
+        const asset = createUploadedAssetRecord(assetId, file, {
+          kind: 'image',
+          width: metadata.width,
+          height: metadata.height,
+        });
+        setProject((current) => addLibraryMediaToProject(current, [{ asset }]));
+        setAssetBlobs((previous) => ({ ...previous, [assetId]: file }));
+      } else {
+        const metadata = await getVideoMetadata(temporaryUrl);
+        const asset = createUploadedAssetRecord(assetId, file, {
+          kind: 'video',
+          duration: Math.max(metadata.duration, MIN_CLIP_DURATION),
+          width: metadata.width,
+          height: metadata.height,
+        });
+        setProject((current) => addLibraryMediaToProject(current, [{ asset }]));
+        setAssetBlobs((previous) => ({ ...previous, [assetId]: file }));
+      }
     } finally {
       URL.revokeObjectURL(temporaryUrl);
     }
