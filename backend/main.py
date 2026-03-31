@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import math
-import re
+import os
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from starlette.datastructures import UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 
 CONFIDENCE_THRESHOLD = 0.55
-WORD_PATTERN = re.compile(r"[0-9A-Za-zÀ-ž]+(?:['’-][0-9A-Za-zÀ-ž]+)?", re.UNICODE)
 
 
 class SubtitleAlignmentRequest(BaseModel):
@@ -26,7 +27,6 @@ class SubtitleAlignmentRequest(BaseModel):
     def validate_excerpt_range(self) -> "SubtitleAlignmentRequest":
         if self.excerptEnd <= self.excerptStart:
             raise ValueError("excerptEnd must be greater than excerptStart.")
-
         return self
 
 
@@ -70,102 +70,74 @@ app.add_middleware(
 )
 
 
-def _normalize_whitespace(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
+def _align_subtitles(request: SubtitleAlignmentRequest, audio_path: str) -> SubtitleAlignmentResponse:
+    from lyrics_timings import user_word_timings
+    from subtitle_common import build_cue_texts, extract_words
+    from whisperx_align import run_whisperx_alignment
 
+    excerpt_duration = request.excerptEnd - request.excerptStart
+    excerpt_start_ms = round(request.excerptStart * 1000)
+    excerpt_end_ms = round(request.excerptEnd * 1000)
 
-def _extract_words(text: str) -> list[str]:
-    return WORD_PATTERN.findall(text)
+    aligned = run_whisperx_alignment(
+        audio_path,
+        request.language,
+        request.sourceText,
+        request.excerptStart,
+        request.excerptEnd,
+    )
 
+    word_rows = user_word_timings(request.sourceText, aligned, excerpt_duration)
 
-def _build_cue_texts(source_text: str, excerpt_duration: float) -> list[str]:
-    stripped_lines = [_normalize_whitespace(line) for line in source_text.splitlines()]
-    cue_texts = [line for line in stripped_lines if line]
-
-    if len(cue_texts) <= 1:
-        normalized_text = _normalize_whitespace(source_text)
-        sentence_split = [segment.strip() for segment in re.split(r"(?<=[.!?])\s+", normalized_text) if segment.strip()]
-        cue_texts = sentence_split if len(sentence_split) > 1 else []
-
-    if not cue_texts:
-        words = _extract_words(source_text)
-        cue_texts = [" ".join(words[index:index + 6]) for index in range(0, len(words), 6)]
-
-    max_cues = max(1, int(max(1, math.floor(excerpt_duration))))
-    if len(cue_texts) <= max_cues:
-        return cue_texts
-
-    merge_size = math.ceil(len(cue_texts) / max_cues)
-    return [
-        " ".join(cue_texts[index:index + merge_size])
-        for index in range(0, len(cue_texts), merge_size)
-    ]
-
-
-def _score_word(word: str) -> float:
-    score = 0.68
-    normalized = word.replace("'", "").replace("’", "").replace("-", "")
-
-    if len(normalized) <= 2:
-        score -= 0.12
-    if any(character.isdigit() for character in normalized):
-        score -= 0.18
-    if not normalized.isalpha():
-        score -= 0.08
-
-    return round(max(0.35, min(score, 0.88)), 2)
-
-
-def _align_lyrics(request: SubtitleAlignmentRequest) -> SubtitleAlignmentResponse:
-    cue_texts = _build_cue_texts(request.sourceText, request.excerptEnd - request.excerptStart)
+    cue_texts = build_cue_texts(request.sourceText, excerpt_duration)
     if not cue_texts:
         raise HTTPException(status_code=400, detail="No lyrics could be extracted from sourceText.")
 
-    cue_words = [_extract_words(cue_text) for cue_text in cue_texts]
+    cue_words = [extract_words(cue_text) for cue_text in cue_texts]
     total_word_count = sum(len(words) for words in cue_words)
-    if total_word_count == 0:
-        raise HTTPException(status_code=400, detail="Lyrics must contain at least one word.")
+    if total_word_count != len(word_rows):
+        raise HTTPException(status_code=500, detail="Internal cue/word split mismatch.")
 
-    excerpt_start_ms = round(request.excerptStart * 1000)
-    excerpt_end_ms = round(request.excerptEnd * 1000)
-    total_duration_ms = max(excerpt_end_ms - excerpt_start_ms, 1000)
-    base_word_duration_ms = total_duration_ms / total_word_count
+    warnings: list[str] = []
+    if not (aligned.get("word_segments") or []):
+        warnings.append("No ASR words; timings were spread evenly across your lyrics.")
 
-    current_ms = excerpt_start_ms
-    processed_word_count = 0
     low_confidence_word_ids: list[str] = []
     cues: list[SubtitleCueResponse] = []
 
-    for cue_index, words in enumerate(cue_words):
+    idx = 0
+    for words in cue_words:
         if not words:
             continue
 
-        cue_start_ms = current_ms
         aligned_words: list[SubtitleWordResponse] = []
+        cue_start_ms: int | None = None
 
-        for word_index, word in enumerate(words):
-            processed_word_count += 1
-            word_start_ms = current_ms
-            if processed_word_count == total_word_count:
-                word_end_ms = excerpt_end_ms
-            else:
-                current_ms = excerpt_start_ms + round(processed_word_count * base_word_duration_ms)
-                word_end_ms = current_ms
+        for _ in words:
+            utext, rs, re, conf = word_rows[idx]
+            idx += 1
+            word_start_ms = excerpt_start_ms + round(rs * 1000)
+            word_end_ms = excerpt_start_ms + round(re * 1000)
+            word_end_ms = min(max(word_end_ms, word_start_ms + 1), excerpt_end_ms)
+            if cue_start_ms is None:
+                cue_start_ms = word_start_ms
 
-            confidence = _score_word(word)
             word_id = uuid4().hex[:10]
-            if confidence < CONFIDENCE_THRESHOLD:
+            if conf < CONFIDENCE_THRESHOLD:
                 low_confidence_word_ids.append(word_id)
 
             aligned_words.append(
                 SubtitleWordResponse(
                     id=word_id,
-                    text=word,
+                    text=utext,
                     startMs=word_start_ms,
-                    endMs=max(word_end_ms, word_start_ms + 1),
-                    confidence=confidence,
+                    endMs=word_end_ms,
+                    confidence=round(conf, 2),
                 )
             )
+
+        if not aligned_words or cue_start_ms is None:
+            continue
 
         cue_end_ms = aligned_words[-1].endMs
         cues.append(
@@ -173,17 +145,15 @@ def _align_lyrics(request: SubtitleAlignmentRequest) -> SubtitleAlignmentRespons
                 id=uuid4().hex[:10],
                 start=round(cue_start_ms / 1000, 3),
                 duration=round(max((cue_end_ms - cue_start_ms) / 1000, 1.0), 3),
-                text=" ".join(word.text for word in aligned_words),
+                text=" ".join(w.text for w in aligned_words),
                 words=aligned_words,
             )
         )
 
     return SubtitleAlignmentResponse(
-        provider="lyric-sync-draft-heuristic",
+        provider="whisperx",
         generatedAt=datetime.now(timezone.utc).isoformat(),
-        warnings=[
-            "Lyric Sync currently uses a draft heuristic aligner based on provided lyrics and excerpt duration. Replace it with a real audio aligner in the next backend iteration.",
-        ],
+        warnings=warnings,
         lowConfidenceWordIds=low_confidence_word_ids,
         cues=cues,
     )
@@ -195,14 +165,52 @@ def healthcheck() -> dict[str, str]:
 
 
 @app.post("/api/lyric-sync/subtitles/align", response_model=SubtitleAlignmentResponse)
-def align_subtitles(request: SubtitleAlignmentRequest) -> SubtitleAlignmentResponse:
+async def align_subtitles(request: Request) -> SubtitleAlignmentResponse:
+    if "multipart/form-data" not in request.headers.get("content-type", "").lower():
+        raise HTTPException(status_code=400, detail="Send multipart/form-data with audio, language, excerptStart, excerptEnd, sourceText.")
+
+    form = await request.form()
+    audio = form.get("audio")
+    if not isinstance(audio, UploadFile):
+        raise HTTPException(status_code=400, detail="Missing audio file field.")
+
+    language = form.get("language")
+    excerpt_start = form.get("excerptStart")
+    excerpt_end = form.get("excerptEnd")
+    source_text = form.get("sourceText")
+    if not isinstance(language, str) or not isinstance(excerpt_start, str) or not isinstance(excerpt_end, str):
+        raise HTTPException(status_code=400, detail="language, excerptStart, excerptEnd required.")
+    if not isinstance(source_text, str):
+        raise HTTPException(status_code=400, detail="sourceText required.")
+
+    try:
+        alignment_request = SubtitleAlignmentRequest(
+            language=language,  # type: ignore[arg-type]
+            excerptStart=float(excerpt_start),
+            excerptEnd=float(excerpt_end),
+            sourceText=source_text,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    suffix = Path(audio.filename or "audio.bin").suffix or ".bin"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        path = tmp.name
+        tmp.write(await audio.read())
+
     logger.info(
-        "Lyric Sync subtitle alignment request received: language={}, excerpt={}s-{}s",
-        request.language,
-        request.excerptStart,
-        request.excerptEnd,
+        "Align: lang={} excerpt={}-{}s",
+        alignment_request.language,
+        alignment_request.excerptStart,
+        alignment_request.excerptEnd,
     )
-    return _align_lyrics(request)
+    try:
+        return _align_subtitles(alignment_request, path)
+    except Exception as exc:
+        logger.exception("Alignment failed")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        os.unlink(path)
 
 
 if __name__ == "__main__":

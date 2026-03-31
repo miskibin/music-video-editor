@@ -9,5 +9,20 @@ dependencies = [
     "langchain>=1.2.13",
     "loguru>=0.7.3",
     "python-ffmpeg>=2.0.12",
+    "python-multipart>=0.0.22",
+    "torch>=2.8.0",
+    "torchaudio>=2.8.0",
     "uvicorn>=0.35.0",
+    "whisperx>=3.8.4",
 ]
+
+# RTX 50-series (Blackwell sm_120): use PyTorch cu128 wheels; local CUDA toolkit is not used at runtime.
+# https://discuss.pytorch.org/t/how-do-i-use-pytorch-with-rtx-5060-ti/220926/15
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }

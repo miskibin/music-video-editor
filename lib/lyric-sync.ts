@@ -13,13 +13,20 @@ const getLyricSyncApiBaseUrl = () => {
   return configuredBaseUrl.replace(/\/$/, '');
 };
 
-export const alignSubtitles = async (input: SubtitleAlignmentInput): Promise<SubtitleAlignmentResult> => {
+export const alignSubtitles = async (
+  input: SubtitleAlignmentInput,
+  audioBlob: Blob,
+): Promise<SubtitleAlignmentResult> => {
+  const form = new FormData();
+  form.append('audio', audioBlob, 'audio');
+  form.append('language', input.language);
+  form.append('excerptStart', String(input.excerptStart));
+  form.append('excerptEnd', String(input.excerptEnd));
+  form.append('sourceText', input.sourceText);
+
   const response = await fetch(`${getLyricSyncApiBaseUrl()}/api/lyric-sync/subtitles/align`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
+    body: form,
   });
 
   const contentType = response.headers.get('content-type') ?? '';

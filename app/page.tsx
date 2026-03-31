@@ -273,7 +273,13 @@ export default function Editor() {
     setProject((currentProject) => startSubtitleAlignment(currentProject, input));
 
     try {
-      const result = await alignSubtitles(input);
+      if (!musicClip?.assetUrl) {
+        throw new Error('Upload music before running alignment.');
+      }
+
+      const audioResponse = await fetch(musicClip.assetUrl);
+      const audioBlob = await audioResponse.blob();
+      const result = await alignSubtitles(input, audioBlob);
 
       if (subtitleAlignmentRequestIdRef.current !== requestId) {
         return;
@@ -288,7 +294,7 @@ export default function Editor() {
       const errorMessage = error instanceof Error ? error.message : 'Subtitle alignment failed.';
       setProject((currentProject) => storeSubtitleAlignmentError(currentProject, input, errorMessage));
     }
-  }, []);
+  }, [musicClip?.assetUrl]);
 
   const handleApplySubtitleAlignment = useCallback((cues: SubtitleCue[]) => {
     setProject((currentProject) => applySubtitleAlignmentResult(currentProject, cues));
