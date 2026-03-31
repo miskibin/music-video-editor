@@ -1,0 +1,5 @@
+{
+  "name": "TikTok Style Video Editor UI",
+  "description": "A frontend UI for a video editing interface with timeline, preview, and properties panel.",
+  "requestFramePermissions": []
+}
