@@ -1,1 +1,27 @@
 @import "tailwindcss";
+
+@layer utilities {
+	.panel-scrollbar {
+		scrollbar-width: thin;
+		scrollbar-color: rgba(161, 161, 170, 0.45) transparent;
+	}
+
+	.panel-scrollbar::-webkit-scrollbar {
+		width: 10px;
+	}
+
+	.panel-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.panel-scrollbar::-webkit-scrollbar-thumb {
+		background-color: rgba(113, 113, 122, 0.5);
+		border: 3px solid transparent;
+		border-radius: 9999px;
+		background-clip: content-box;
+	}
+
+	.panel-scrollbar:hover::-webkit-scrollbar-thumb {
+		background-color: rgba(161, 161, 170, 0.62);
+	}
+}

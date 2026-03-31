@@ -207,6 +207,11 @@ const INITIAL_TRACKS: Track[] = [
   { id: 'a1', name: 'A1 - Audio', type: 'audio' },
 ];
 
+const TIMELINE_CHROME_HEIGHT = 64;
+const TIMELINE_TRACK_HEIGHT = 48;
+const TIMELINE_BOTTOM_PADDING = 4;
+const TIMELINE_HEIGHT = TIMELINE_CHROME_HEIGHT + (INITIAL_TRACKS.length * TIMELINE_TRACK_HEIGHT) + TIMELINE_BOTTOM_PADDING;
+
 const INITIAL_CLIPS: Clip[] = [
   { id: 'c1', trackId: 'v1', name: 'Intro.mp4', color: '#2563eb', start: 0, duration: 15, visualType: 'gradient' },
   { id: 'c2', trackId: 'v1', name: 'Main_Sequence.mp4', color: '#2563eb', start: 15, duration: 30, visualType: 'gradient' },
@@ -629,7 +634,7 @@ export default function Editor() {
             </div>
             <PropertiesPanel clip={selectedClip} onChange={handleUpdateClip} />
           </div>
-          <div className="h-64 border-t border-zinc-800 bg-zinc-950 shrink-0">
+          <div className="border-t border-zinc-800 bg-zinc-950 shrink-0" style={{ height: `${TIMELINE_HEIGHT}px` }}>
             <Timeline 
               tracks={INITIAL_TRACKS}
               clips={clips}

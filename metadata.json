@@ -1,5 +1,5 @@
 {
-  "name": "TikTok Style Video Editor UI",
-  "description": "A frontend UI for a video editing interface with timeline, preview, and properties panel.",
+  "name": "Music Video Creator",
+  "description": "A vertical music video creator for TikTok with word-aligned subtitles, AI-assisted background visuals, and MP4 export.",
   "requestFramePermissions": []
 }
