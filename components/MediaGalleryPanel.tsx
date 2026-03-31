@@ -27,6 +27,11 @@ import {
 const PEXELS_KEY_STORAGE = 'mve_pexels_api_key';
 const PIXABAY_KEY_STORAGE = 'mve_pixabay_api_key';
 
+/** Official pages to obtain API keys */
+const PEXELS_GET_API_KEY_URL = 'https://www.pexels.com/api/';
+const PIXABAY_API_DOCS_URL = 'https://pixabay.com/api/docs/';
+const PIXABAY_ACCOUNT_URL = 'https://pixabay.com/accounts/edit/';
+
 const MAX_SEARCH_RESULTS = 10;
 
 function readStockKeys(): { pexels: string | null; pixabay: string | null } {
@@ -377,8 +382,8 @@ function MediaGalleryPanel({
           <DialogHeader>
             <DialogTitle className="text-zinc-100">Stock photo search</DialogTitle>
             <DialogDescription className="text-zinc-500">
-              Optional keys for Pexels and Pixabay. They are stored only in this browser. You can paste a new key to
-              replace; keys are never shown again after you close this dialog.
+              Optional keys for Pexels and Pixabay. They are stored only in this browser. Paste a new key to replace an
+              existing one; saved keys are never shown again after you close this dialog.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -391,6 +396,17 @@ function MediaGalleryPanel({
                   </Button>
                 ) : null}
               </div>
+              <p className="text-[11px] leading-relaxed text-zinc-500">
+                Get a free API key:{' '}
+                <a
+                  href={PEXELS_GET_API_KEY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-emerald-500/95 underline underline-offset-2 hover:text-emerald-400"
+                >
+                  {PEXELS_GET_API_KEY_URL}
+                </a>
+              </p>
               <Input
                 type="password"
                 autoComplete="off"
@@ -411,6 +427,30 @@ function MediaGalleryPanel({
                     Remove saved key
                   </Button>
                 ) : null}
+              </div>
+              <div className="space-y-1 text-[11px] leading-relaxed text-zinc-500">
+                <p>
+                  Docs:{' '}
+                  <a
+                    href={PIXABAY_API_DOCS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-emerald-500/95 underline underline-offset-2 hover:text-emerald-400"
+                  >
+                    {PIXABAY_API_DOCS_URL}
+                  </a>
+                </p>
+                <p>
+                  API key in account (after login):{' '}
+                  <a
+                    href={PIXABAY_ACCOUNT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-emerald-500/95 underline underline-offset-2 hover:text-emerald-400"
+                  >
+                    {PIXABAY_ACCOUNT_URL}
+                  </a>
+                </p>
               </div>
               <Input
                 type="password"
