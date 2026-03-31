@@ -314,8 +314,8 @@ export default function Editor() {
         && currentProject.background.segments[0]?.visualType === 'gradient';
       const assetId = createId();
       const segmentId = createId();
-      const safeSourceDuration = isVideo && 'duration' in metadata
-        ? Math.max(metadata.duration, MIN_CLIP_DURATION)
+      const safeSourceDuration = isVideo
+        ? Math.max((metadata as { duration: number; width: number; height: number }).duration, MIN_CLIP_DURATION)
         : undefined;
       const segment: BackgroundSegment = {
         id: segmentId,
