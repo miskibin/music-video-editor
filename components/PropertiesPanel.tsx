@@ -34,7 +34,7 @@ const formatSeconds = (seconds: number) => `${seconds.toFixed(1)}s`;
 function PropertiesPanel({ clip, onChange }: Props) {
   if (!clip) {
     return (
-      <aside className="w-72 border-l border-zinc-800/80 bg-zinc-950 shrink-0 overflow-hidden">
+      <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-zinc-800/80 bg-zinc-950">
         <div className="flex h-full items-center justify-center px-6 text-center">
           <div className="flex max-w-44 flex-col gap-2">
             <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Inspector</p>
@@ -54,7 +54,7 @@ function PropertiesPanel({ clip, onChange }: Props) {
   const durationValue = Number(clip.duration.toFixed(1));
 
   return (
-    <aside className="w-72 border-l border-zinc-800/80 bg-zinc-950 shrink-0 overflow-hidden">
+    <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-zinc-800/80 bg-zinc-950">
       <div className="flex h-12 items-center border-b border-zinc-800/80 px-4 shrink-0">
         <h2 className="text-sm font-medium text-zinc-200">Clip Properties</h2>
       </div>
@@ -123,7 +123,7 @@ function PropertiesPanel({ clip, onChange }: Props) {
                 className="h-9 border-zinc-800/80 bg-zinc-950/80 font-mono text-zinc-100 focus-visible:ring-zinc-600"
               />
             </div>
-          </div>
+          </section>
 
           <section className="flex flex-col gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4">
             <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-600">Timing</p>
@@ -170,7 +170,7 @@ function PropertiesPanel({ clip, onChange }: Props) {
                 <p className="mt-1 text-zinc-300">{clip.visualType ?? clipKind}</p>
               </div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </aside>

@@ -101,6 +101,40 @@ At a high level, the product is best split into these stages:
 5. Apply simple transitions and beat-reactive motion.
 6. Render to vertical MP4.
 
+## Remotion and FFmpeg
+
+The stack should use both tools, but for different responsibilities.
+
+- Remotion should handle composition: the vertical 9:16 scene, timed subtitles, background image or video layout, transitions, and music-reactive motion.
+- FFmpeg should handle media processing: probing uploads, re-encoding incompatible files, trimming or normalizing source media, preparing proxy assets, and optimizing the final MP4.
+- Word-level lyric alignment should live in the backend, not in Remotion or FFmpeg directly. That service should output timestamped JSON which Remotion can render.
+
+## Product Phases
+
+### Phase 1: Editor Prototype
+
+This is the current app state.
+
+The app already has a working frontend editor prototype with a fixed three-track timeline metaphor, clip selection, dragging and resizing, a 9:16 preview, manual text clips, uploaded music playback, browser-side waveform extraction, and uploaded image support for the background layer. It is a strong UI foundation for the product direction, but it is still a prototype rather than a full music-video pipeline.
+
+What is not in Phase 1 yet: real backend workflows, word-level subtitle alignment, AI media sourcing or generation, uploaded background video handling, Remotion-based rendering, FFmpeg preprocessing, and production MP4 export.
+
+### Phase 2: Structured Project Model
+
+Turn the prototype into a product-ready editor model. This phase should lock the project schema to exactly three layers, persist project data cleanly, separate editable timeline state from render state, and define the JSON contracts for music, subtitles, background media, transitions, and beat markers.
+
+### Phase 3: Alignment and Media Intelligence
+
+Add the first real backend workflows. This phase should align user-provided lyrics to audio with word-level timestamps, construct prompts from lyrics plus user input, and source or generate background visuals from open assets or AI generation tools.
+
+### Phase 4: Motion and Rendering
+
+Introduce the actual video composition pipeline. This phase should use Remotion to render timed subtitles, background sequences, transitions, and music-reactive motion such as kick-based zooms or pulse effects.
+
+### Phase 5: Export and Production Hardening
+
+Finish the delivery pipeline. This phase should use FFmpeg to normalize media inputs, handle final post-processing, and export a stable TikTok-ready MP4 while adding reliability, validation, and quality controls around the full workflow.
+
 ## Development Focus
 
 The current implementation should prioritize:
