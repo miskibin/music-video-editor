@@ -12,9 +12,9 @@ Create a focused editor and export pipeline for short-form music videos where mu
 
 ## Current Status
 
-As of March 2026, the project is in early Phase 2.
+As of March 2026, the project is moving from Phase 2 into the first slice of Phase 3.
 
-The app is no longer just a visual prototype. It now has a structured frontend project model for the fixed three-layer editor, local project persistence in the browser, and support for both background images and background videos. The backend rendering and AI pipeline are still not implemented.
+The app is no longer just a visual prototype. It now has a structured frontend project model for the fixed three-layer editor, local project persistence in the browser, support for both background images and background videos, and the first draft of a backend-assisted Lyric Sync workflow for subtitle timing review.
 
 What works now:
 
@@ -25,12 +25,13 @@ What works now:
 - music upload, duration probing, waveform extraction, playback, scrubbing, and trim-aware timeline editing
 - subtitle cue creation and editing on a dedicated subtitle track
 - background image and video upload, metadata probing, timeline placement, and preview playback
+- draft Lyric Sync flow with a FastAPI endpoint, excerpt/language inputs, reviewable generated cues, low-confidence word highlighting, and apply-back-to-project behavior
 - drag, resize, selection, zoom, and inspector-based clip editing
 
 What is still missing:
 
-- backend API and orchestration workflows
-- word-level lyric alignment from Whisper or forced alignment
+- real audio-based word alignment from Whisper or forced alignment
+- scene planning and media discovery workflows behind the Lyric Sync phase
 - AI sourcing or generation of background media
 - real transition controls and music-reactive motion controls beyond the current schema placeholders
 - Remotion render pipeline
@@ -148,11 +149,11 @@ This phase established the UI foundation: a fixed three-track timeline metaphor,
 
 Current phase.
 
-This phase moves the app from a loose prototype into a product-shaped editor. The frontend now uses a versioned project document, a fixed three-layer data model, a persisted single active project, saved asset blobs, and uploaded background video support. The remaining work in this phase is hardening the model, improving the editor around that model, and preparing cleaner boundaries for later backend and render work.
+This phase moves the app from a loose prototype into a product-shaped editor. The frontend now uses a versioned project document, a fixed three-layer data model, a persisted single active project, saved asset blobs, and uploaded background video support. The remaining work in this phase is hardening the model, improving the editor around that model, and keeping the project schema stable as backend-assisted workflows expand.
 
 ### Phase 3: Lyric Sync and Media Discovery
 
-Add the first real backend workflows. This phase should align user-provided lyrics to audio with word-level timestamps through a Lyric Sync workflow, then source or generate background visuals from lyrics plus user direction.
+This phase adds the first real backend workflows. The first slice is now in place as a draft Lyric Sync flow for lyrics timing review. The remaining work in this phase is replacing the heuristic aligner with real audio-aware alignment, then adding scene planning and media discovery from lyrics plus user direction.
 
 ### Phase 4: Motion and Rendering
 
@@ -166,9 +167,9 @@ Finish the delivery pipeline. This phase should use FFmpeg to normalize media in
 
 The current implementation should prioritize:
 
-1. hardening the Phase 2 project model and persistence flow
-2. adding reliable lyric-to-audio alignment with word-level timestamps
-3. connecting AI-assisted background media sourcing and generation
+1. replacing the draft Lyric Sync heuristic with real lyric-to-audio alignment and word-level timestamps
+2. adding scene planning and AI-assisted background media sourcing and generation
+3. hardening the project model and persistence flow around the new backend workflows
 4. implementing the Remotion composition pipeline from the saved project document
 5. adding FFmpeg preprocessing and final MP4 export
 
