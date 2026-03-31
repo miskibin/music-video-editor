@@ -55,7 +55,14 @@ const transitionSchema = z.object({
 });
 
 const motionSchema = z.object({
-  mode: z.enum(['none', 'beat-pulse', 'kick-zoom']),
+  mode: z.enum([
+    'none',
+    'beat-pulse',
+    'kick-zoom',
+    'slow-zoom-in',
+    'slow-zoom-out',
+    'slow-breathe',
+  ]),
   strength: z.number().min(0),
   sensitivity: z.number().min(0).max(1).default(0.65),
   smoothness: z.number().min(0).max(1).default(0.5),

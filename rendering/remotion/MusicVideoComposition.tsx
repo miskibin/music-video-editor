@@ -36,7 +36,9 @@ export const MusicVideoComposition = ({ manifest }: MusicVideoCompositionProps) 
           />
         </Sequence>
       ) : null}
-      <SubtitleTrack cues={manifest.subtitleCues} subtitleStyle={manifest.subtitleStyle} />
+      <AbsoluteFill style={{ zIndex: 30, pointerEvents: 'none' }}>
+        <SubtitleTrack cues={manifest.subtitleCues} subtitleStyle={manifest.subtitleStyle} />
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };

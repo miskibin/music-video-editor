@@ -102,7 +102,13 @@ export interface TransitionConfig {
   ease?: TransitionEase;
 }
 
-export type MotionMode = 'none' | 'beat-pulse' | 'kick-zoom';
+export type MotionMode =
+  | 'none'
+  | 'beat-pulse'
+  | 'kick-zoom'
+  | 'slow-zoom-in'
+  | 'slow-zoom-out'
+  | 'slow-breathe';
 
 export interface MotionConfig {
   mode: MotionMode;

@@ -12,6 +12,7 @@ import type {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { SUBTITLE_BG_SWATCHES, SUBTITLE_TEXT_SWATCHES } from '@/lib/subtitle-colors';
 
 interface Props {
   clip: Clip | null;
@@ -279,7 +280,23 @@ const transitionKinds: TransitionConfig['kind'][] = [
   'flash',
 ];
 
-const motionModes: MotionConfig['mode'][] = ['none', 'beat-pulse', 'kick-zoom'];
+const motionModes: MotionConfig['mode'][] = [
+  'none',
+  'beat-pulse',
+  'kick-zoom',
+  'slow-zoom-in',
+  'slow-zoom-out',
+  'slow-breathe',
+];
+
+const motionModeLabels: Record<MotionConfig['mode'], string> = {
+  none: 'None',
+  'beat-pulse': 'Beat pulse',
+  'kick-zoom': 'Kick zoom',
+  'slow-zoom-in': 'Slow zoom in (whole clip)',
+  'slow-zoom-out': 'Slow zoom out (whole clip)',
+  'slow-breathe': 'Slow breathe zoom (whole clip)',
+};
 
 function PropertiesPanel({
   clip,
@@ -399,24 +416,44 @@ function PropertiesPanel({
               />
             </div>
 
-            <div className="mb-3 grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-zinc-600">Text</Label>
-                <Input
-                  type="color"
-                  value={subtitleStyle.textColor}
-                  onChange={(e) => onSubtitleStyleChange({ textColor: e.target.value })}
-                  className="h-9 cursor-pointer border-zinc-800/60 bg-transparent p-1"
-                />
+            <div className="mb-3 flex flex-col gap-2">
+              <Label className="text-[11px] text-zinc-600">Text color</Label>
+              <div className="flex flex-wrap gap-2">
+                {SUBTITLE_TEXT_SWATCHES.map((hex) => {
+                  const active = subtitleStyle.textColor.toLowerCase() === hex.toLowerCase();
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      title={hex}
+                      className={`size-7 rounded-md border border-zinc-700/80 shadow-inner transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                        active ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950' : 'hover:opacity-90'
+                      }`}
+                      style={{ backgroundColor: hex }}
+                      onClick={() => onSubtitleStyleChange({ textColor: hex })}
+                    />
+                  );
+                })}
               </div>
-              <div className="flex flex-col gap-1">
-                <Label className="text-[11px] text-zinc-600">Background</Label>
-                <Input
-                  type="color"
-                  value={subtitleStyle.backgroundColor}
-                  onChange={(e) => onSubtitleStyleChange({ backgroundColor: e.target.value })}
-                  className="h-9 cursor-pointer border-zinc-800/60 bg-transparent p-1"
-                />
+            </div>
+            <div className="mb-3 flex flex-col gap-2">
+              <Label className="text-[11px] text-zinc-600">Card background</Label>
+              <div className="flex flex-wrap gap-2">
+                {SUBTITLE_BG_SWATCHES.map((hex) => {
+                  const active = subtitleStyle.backgroundColor.toLowerCase() === hex.toLowerCase();
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      title={hex}
+                      className={`size-7 rounded-md border border-zinc-600/50 shadow-inner transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                        active ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950' : 'hover:opacity-90'
+                      }`}
+                      style={{ backgroundColor: hex }}
+                      onClick={() => onSubtitleStyleChange({ backgroundColor: hex })}
+                    />
+                  );
+                })}
               </div>
             </div>
 
@@ -651,7 +688,7 @@ function PropertiesPanel({
                 })}
               >
                 {motionModes.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>{motionModeLabels[m]}</option>
                 ))}
               </select>
             </div>
@@ -671,66 +708,70 @@ function PropertiesPanel({
                 })}
               />
             </div>
-            <div className="mb-2 flex flex-col gap-2 py-0.5">
-              <div className="flex justify-between text-[11px] text-zinc-600">
-                <span>Sensitivity</span>
-                <span className="font-mono text-zinc-400">{globalMotion.sensitivity.toFixed(2)}</span>
-              </div>
-              <Slider
-                min={0}
-                max={100}
-                step={1}
-                value={[Math.round(globalMotion.sensitivity * 100)]}
-                onValueChange={([v]) => onGlobalBackgroundChange({
-                  motion: { ...globalMotion, sensitivity: (v ?? 65) / 100 },
-                })}
-              />
-            </div>
-            <div className="mb-2 flex flex-col gap-2 py-0.5">
-              <div className="flex justify-between text-[11px] text-zinc-600">
-                <span>Smoothness</span>
-                <span className="font-mono text-zinc-400">{globalMotion.smoothness.toFixed(2)}</span>
-              </div>
-              <Slider
-                min={0}
-                max={100}
-                step={1}
-                value={[Math.round(globalMotion.smoothness * 100)]}
-                onValueChange={([v]) => onGlobalBackgroundChange({
-                  motion: { ...globalMotion, smoothness: (v ?? 50) / 100 },
-                })}
-              />
-            </div>
-            <div className="mb-2 flex flex-col gap-2 py-0.5">
-              <div className="flex justify-between text-[11px] text-zinc-600">
-                <span>Beat frequency ×</span>
-                <span className="font-mono text-zinc-400">{globalMotion.frequencyMultiplier.toFixed(2)}</span>
-              </div>
-              <Slider
-                min={25}
-                max={400}
-                step={5}
-                value={[Math.round(globalMotion.frequencyMultiplier * 100)]}
-                onValueChange={([v]) => onGlobalBackgroundChange({
-                  motion: { ...globalMotion, frequencyMultiplier: (v ?? 100) / 100 },
-                })}
-              />
-            </div>
-            <div className="mb-2 flex flex-col gap-2 py-0.5">
-              <div className="flex justify-between text-[11px] text-zinc-600">
-                <span>Kick decay</span>
-                <span className="font-mono text-zinc-400">{globalMotion.decay.toFixed(2)}</span>
-              </div>
-              <Slider
-                min={0}
-                max={100}
-                step={1}
-                value={[Math.round(globalMotion.decay * 100)]}
-                onValueChange={([v]) => onGlobalBackgroundChange({
-                  motion: { ...globalMotion, decay: (v ?? 55) / 100 },
-                })}
-              />
-            </div>
+            {globalMotion.mode === 'beat-pulse' || globalMotion.mode === 'kick-zoom' ? (
+              <>
+                <div className="mb-2 flex flex-col gap-2 py-0.5">
+                  <div className="flex justify-between text-[11px] text-zinc-600">
+                    <span>Sensitivity</span>
+                    <span className="font-mono text-zinc-400">{globalMotion.sensitivity.toFixed(2)}</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[Math.round(globalMotion.sensitivity * 100)]}
+                    onValueChange={([v]) => onGlobalBackgroundChange({
+                      motion: { ...globalMotion, sensitivity: (v ?? 65) / 100 },
+                    })}
+                  />
+                </div>
+                <div className="mb-2 flex flex-col gap-2 py-0.5">
+                  <div className="flex justify-between text-[11px] text-zinc-600">
+                    <span>Smoothness</span>
+                    <span className="font-mono text-zinc-400">{globalMotion.smoothness.toFixed(2)}</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[Math.round(globalMotion.smoothness * 100)]}
+                    onValueChange={([v]) => onGlobalBackgroundChange({
+                      motion: { ...globalMotion, smoothness: (v ?? 50) / 100 },
+                    })}
+                  />
+                </div>
+                <div className="mb-2 flex flex-col gap-2 py-0.5">
+                  <div className="flex justify-between text-[11px] text-zinc-600">
+                    <span>Beat frequency ×</span>
+                    <span className="font-mono text-zinc-400">{globalMotion.frequencyMultiplier.toFixed(2)}</span>
+                  </div>
+                  <Slider
+                    min={25}
+                    max={400}
+                    step={5}
+                    value={[Math.round(globalMotion.frequencyMultiplier * 100)]}
+                    onValueChange={([v]) => onGlobalBackgroundChange({
+                      motion: { ...globalMotion, frequencyMultiplier: (v ?? 100) / 100 },
+                    })}
+                  />
+                </div>
+                <div className="mb-2 flex flex-col gap-2 py-0.5">
+                  <div className="flex justify-between text-[11px] text-zinc-600">
+                    <span>Kick decay</span>
+                    <span className="font-mono text-zinc-400">{globalMotion.decay.toFixed(2)}</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[Math.round(globalMotion.decay * 100)]}
+                    onValueChange={([v]) => onGlobalBackgroundChange({
+                      motion: { ...globalMotion, decay: (v ?? 55) / 100 },
+                    })}
+                  />
+                </div>
+              </>
+            ) : null}
           </section>
           ) : null}
 

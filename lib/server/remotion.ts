@@ -42,5 +42,8 @@ export const renderManifestToMp4 = async (
     inputProps,
     logLevel: 'error',
     onProgress: callbacks?.onRenderProgress,
+    /** First frame can exceed 30s when loading media; delayRender() uses this cap. */
+    timeoutInMilliseconds: 180_000,
+    overwrite: true,
   });
 };

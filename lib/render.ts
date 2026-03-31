@@ -210,11 +210,8 @@ export const createRenderManifest = (
   options?: CreateRenderManifestOptions,
 ): RenderManifest => {
   const music = project.music.clip;
+  /** If the asset is not in `assetSources` yet (e.g. preview before blobs load), omit audio — do not fail the manifest or subtitles. */
   const musicSrc = music?.assetId ? assetSources[music.assetId] : undefined;
-
-  if (music?.assetId && !musicSrc) {
-    throw new Error(`Missing staged music asset for "${music.name}".`);
-  }
 
   const subtitleCues = project.subtitles.cues
     .map((cue) => toVisibleCue(cue, music, fps))
@@ -223,10 +220,7 @@ export const createRenderManifest = (
 
   const backgroundSegments = project.background.segments
     .map((segment) => {
-      const src = segment.assetId ? assetSources[segment.assetId] : null;
-      if (segment.assetId && !src) {
-        throw new Error(`Missing staged background asset for "${segment.name}".`);
-      }
+      const src = segment.assetId ? (assetSources[segment.assetId] ?? null) : null;
 
       return toRenderBackgroundSegment(
         segment,

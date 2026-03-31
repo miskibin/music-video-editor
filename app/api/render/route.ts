@@ -1,5 +1,6 @@
 import { parseProjectDocument } from '@/lib/project';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   createRenderManifest,
   getReferencedRenderAssetIds,
@@ -103,9 +104,10 @@ const processRenderJob = async (
       onRenderProgress: (progress) => {
         const renderedRatio = Math.max(0, Math.min(1, progress.renderedFrames / totalFrames));
         const encodedRatio = Math.max(0, Math.min(1, progress.encodedFrames / totalFrames));
+        const remotionOverall = Math.max(0, Math.min(1, progress.progress));
 
-        let percent = 0.18 + renderedRatio * 0.68;
-        let message = `Rendering frames ${Math.round(renderedRatio * 100)}% (${progress.renderedFrames}/${totalFrames})`;
+        let percent = 0.18 + remotionOverall * 0.68;
+        let message = `Rendering ${Math.round(remotionOverall * 100)}% — frames ${progress.renderedFrames}/${totalFrames}`;
 
         if (renderedRatio >= 0.999) {
           percent = 0.86 + encodedRatio * 0.1;
@@ -171,9 +173,7 @@ export async function POST(request: Request) {
       return Response.json({ detail: 'Upload music before rendering.' }, { status: 400 });
     }
 
-    const assetSources: Record<string, string> = {};
     const assetIndexRecord: Record<string, Awaited<ReturnType<typeof stageRenderAsset>>> = {};
-    const origin = new URL(request.url).origin;
     const referencedAssets = getReferencedRenderAssetIds(parsedProject);
 
     for (const [index, assetId] of referencedAssets.entries()) {
@@ -200,7 +200,6 @@ export async function POST(request: Request) {
       );
 
       assetIndexRecord[assetId] = stagedAsset;
-      assetSources[assetId] = `${origin}/api/render-assets/${encodeURIComponent(jobId)}/${encodeURIComponent(assetId)}`;
     }
 
     updateRenderJobStatus(jobId, {
@@ -212,6 +211,18 @@ export async function POST(request: Request) {
     const audioAlreadyTrimmed = await maybePretrimMusicAsset(jobId, parsedProject, assetIndexRecord);
 
     await writeRenderAssetIndex(jobId, assetIndexRecord);
+
+    /** Local file URLs — HTTP asset URLs often hang headless Chromium on Windows (localhost / IPv6). */
+    const assetSources: Record<string, string> = {};
+    for (const assetId of referencedAssets) {
+      const entry = assetIndexRecord[assetId];
+      if (!entry) {
+        deleteRenderJobStatus(jobId);
+        await cleanupRenderJob(jobId);
+        return Response.json({ detail: `Missing staged asset "${assetId}".` }, { status: 400 });
+      }
+      assetSources[assetId] = pathToFileURL(path.resolve(entry.filePath)).href;
+    }
 
     const manifest = createRenderManifest(parsedProject, assetSources, undefined, {
       audioAlreadyTrimmed,
