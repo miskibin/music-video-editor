@@ -729,6 +729,29 @@ export default function Editor() {
     setAssetBlobs((previous) => ({ ...previous, ...newBlobs }));
   }, []);
 
+  const handleImportStockImage = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      return;
+    }
+
+    const temporaryUrl = URL.createObjectURL(file);
+
+    try {
+      const assetId = createId();
+      const metadata = await getImageMetadata(temporaryUrl);
+      const asset = createUploadedAssetRecord(assetId, file, {
+        kind: 'image',
+        width: metadata.width,
+        height: metadata.height,
+      });
+
+      setProject((current) => addLibraryMediaToProject(current, [{ asset }]));
+      setAssetBlobs((previous) => ({ ...previous, [assetId]: file }));
+    } finally {
+      URL.revokeObjectURL(temporaryUrl);
+    }
+  }, []);
+
   const handleRemoveMediaLibraryAsset = useCallback((assetId: string) => {
     setProject((current) => {
       const result = removeLibraryAsset(current, assetId);
@@ -1189,13 +1212,16 @@ export default function Editor() {
               className="flex min-h-0 flex-col"
             >
               <div className="flex min-h-0 flex-1 overflow-hidden">
-                <MediaGalleryPanel
-                  assets={galleryAssets}
-                  assetUrls={assetUrls}
-                  referencedIds={referencedAssetIdsForGallery}
-                  onAddFiles={handleAddMediaLibraryFiles}
-                  onRemoveAsset={handleRemoveMediaLibraryAsset}
-                />
+                <div className="flex h-full w-[480px] shrink-0 flex-col">
+                  <MediaGalleryPanel
+                    assets={galleryAssets}
+                    assetUrls={assetUrls}
+                    referencedIds={referencedAssetIdsForGallery}
+                    onAddFiles={handleAddMediaLibraryFiles}
+                    onRemoveAsset={handleRemoveMediaLibraryAsset}
+                    onImportStockImage={handleImportStockImage}
+                  />
+                </div>
                 <div className="preview-stage flex min-h-0 min-w-0 flex-1 flex-col bg-zinc-900">
                   <div className="flex min-h-0 flex-1 items-center justify-center">
                     <VideoPreview
