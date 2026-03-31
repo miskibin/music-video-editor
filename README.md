@@ -10,6 +10,33 @@ The product should take the core elements of a track, its lyrics, and a lightwei
 
 Create a focused editor and export pipeline for short-form music videos where music is the center of the project and every other element is built around it.
 
+## Current Status
+
+As of March 2026, the project is in early Phase 2.
+
+The app is no longer just a visual prototype. It now has a structured frontend project model for the fixed three-layer editor, local project persistence in the browser, and support for both background images and background videos. The backend rendering and AI pipeline are still not implemented.
+
+What works now:
+
+- fixed 9:16 editor and preview built around the 3 product layers: background, subtitles, and music
+- versioned project document and typed layer model for music, subtitle cues, background segments, and asset records
+- one active project persisted locally with IndexedDB, including uploaded asset blobs across refresh
+- autosave plus manual save state in the top bar
+- music upload, duration probing, waveform extraction, playback, scrubbing, and trim-aware timeline editing
+- subtitle cue creation and editing on a dedicated subtitle track
+- background image and video upload, metadata probing, timeline placement, and preview playback
+- drag, resize, selection, zoom, and inspector-based clip editing
+
+What is still missing:
+
+- backend API and orchestration workflows
+- word-level lyric alignment from Whisper or forced alignment
+- AI sourcing or generation of background media
+- real transition controls and music-reactive motion controls beyond the current schema placeholders
+- Remotion render pipeline
+- FFmpeg ingest and post-processing pipeline
+- MP4 export
+
 ## Product Constraints
 
 These are hard constraints for the product scope:
@@ -113,19 +140,19 @@ The stack should use both tools, but for different responsibilities.
 
 ### Phase 1: Editor Prototype
 
-This is the current app state.
+Completed.
 
-The app already has a working frontend editor prototype with a fixed three-track timeline metaphor, clip selection, dragging and resizing, a 9:16 preview, manual text clips, uploaded music playback, browser-side waveform extraction, and uploaded image support for the background layer. It is a strong UI foundation for the product direction, but it is still a prototype rather than a full music-video pipeline.
-
-What is not in Phase 1 yet: real backend workflows, word-level subtitle alignment, AI media sourcing or generation, uploaded background video handling, Remotion-based rendering, FFmpeg preprocessing, and production MP4 export.
+This phase established the UI foundation: a fixed three-track timeline metaphor, a 9:16 preview, basic clip editing, music upload and playback, waveform generation, subtitle cue editing, and background media placement.
 
 ### Phase 2: Structured Project Model
 
-Turn the prototype into a product-ready editor model. This phase should lock the project schema to exactly three layers, persist project data cleanly, separate editable timeline state from render state, and define the JSON contracts for music, subtitles, background media, transitions, and beat markers.
+Current phase.
+
+This phase moves the app from a loose prototype into a product-shaped editor. The frontend now uses a versioned project document, a fixed three-layer data model, a persisted single active project, saved asset blobs, and uploaded background video support. The remaining work in this phase is hardening the model, improving the editor around that model, and preparing cleaner boundaries for later backend and render work.
 
 ### Phase 3: Alignment and Media Intelligence
 
-Add the first real backend workflows. This phase should align user-provided lyrics to audio with word-level timestamps, construct prompts from lyrics plus user input, and source or generate background visuals from open assets or AI generation tools.
+Add the first real backend workflows. This phase should align user-provided lyrics to audio with word-level timestamps and source or generate background visuals from lyrics plus user direction.
 
 ### Phase 4: Motion and Rendering
 
@@ -139,11 +166,11 @@ Finish the delivery pipeline. This phase should use FFmpeg to normalize media in
 
 The current implementation should prioritize:
 
-1. locking the product to a vertical 9:16 composition
-2. defining the three-layer data model clearly
-3. adding reliable lyric-to-audio alignment
-4. connecting AI-assisted media sourcing for the background layer
-5. implementing a stable MP4 export pipeline
+1. hardening the Phase 2 project model and persistence flow
+2. adding reliable lyric-to-audio alignment with word-level timestamps
+3. connecting AI-assisted background media sourcing and generation
+4. implementing the Remotion composition pipeline from the saved project document
+5. adding FFmpeg preprocessing and final MP4 export
 
 ## Run Locally
 

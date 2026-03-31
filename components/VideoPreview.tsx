@@ -14,7 +14,6 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 export default function VideoPreview({ currentTime, isPlaying, visualClip, subtitleText }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const beatPulse = isPlaying ? (Math.sin((currentTime * 140 * Math.PI) / 60) + 1) / 2 : 0.18;
-  const imageScale = 1 + beatPulse * 0.04;
   const baseColor = visualClip?.color ?? '#2563eb';
   const isVideoClip = visualClip?.assetKind === 'video' || visualClip?.visualType === 'video';
   const visualOffset = useMemo(() => {
@@ -53,10 +52,6 @@ export default function VideoPreview({ currentTime, isPlaying, visualClip, subti
             muted
             playsInline
             className="absolute inset-0 h-full w-full object-cover"
-            style={{
-              transform: `scale(${imageScale})`,
-              filter: `saturate(${1.02 + beatPulse * 0.16}) brightness(${0.9 + beatPulse * 0.1})`,
-            }}
           />
         ) : visualClip?.assetUrl ? (
           <Image
@@ -65,10 +60,6 @@ export default function VideoPreview({ currentTime, isPlaying, visualClip, subti
             fill
             unoptimized
             className="absolute inset-0 h-full w-full object-cover"
-            style={{
-              transform: `scale(${imageScale})`,
-              filter: `saturate(${1.05 + beatPulse * 0.2}) brightness(${0.88 + beatPulse * 0.12})`,
-            }}
           />
         ) : (
           <div
