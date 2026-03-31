@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Save, Settings, Subtitles, Undo, Redo } from 'lucide-react';
+import { Download, FilePlus, Save, Settings, Subtitles, Undo, Redo } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SubtitleAlignmentStatus } from '@/lib/types';
@@ -11,8 +11,10 @@ interface Props {
   musicBpm: number | null;
   saveState: SaveState;
   renderState: 'idle' | 'rendering' | 'success' | 'error';
+  renderProgress: number;
   renderMessage: string | null;
   onSave: () => void;
+  onNewProject: () => void;
   onExport: () => void;
   onOpenSubtitleAlignment: () => void;
   subtitleAlignmentStatus: SubtitleAlignmentStatus;
@@ -25,8 +27,10 @@ function TopBar({
   musicBpm,
   saveState,
   renderState,
+  renderProgress,
   renderMessage,
   onSave,
+  onNewProject,
   onExport,
   onOpenSubtitleAlignment,
   subtitleAlignmentStatus,
@@ -49,9 +53,18 @@ function TopBar({
         : 'Run Lyric Sync';
   const exportLabel = renderState === 'rendering' ? 'Rendering MP4' : 'Export MP4';
   const exportTone = renderState === 'error' ? 'text-rose-300' : 'text-zinc-400';
+  const progressPercent = Math.max(0, Math.min(100, Math.round(renderProgress * 100)));
 
   return (
-    <header className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
+    <header className="relative h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
+      {renderState === 'rendering' ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-zinc-800">
+          <div
+            className="h-full bg-white transition-[width] duration-300 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      ) : null}
       <div className="flex items-center gap-4">
         <div className="font-semibold text-sm">{projectName}</div>
         {musicBpm != null ? (
@@ -60,6 +73,16 @@ function TopBar({
             <span className="text-xs font-mono text-zinc-400 tabular-nums">{musicBpm} BPM</span>
           </>
         ) : null}
+        <Separator orientation="vertical" className="h-6 bg-zinc-800" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onNewProject}
+          className="text-zinc-300 hover:bg-zinc-800 hover:text-white"
+        >
+          <FilePlus className="w-4 h-4 mr-2" />
+          New project
+        </Button>
         <Separator orientation="vertical" className="h-6 bg-zinc-800" />
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" disabled className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 disabled:opacity-40">
@@ -73,7 +96,7 @@ function TopBar({
       <div className="flex items-center gap-2">
         {renderMessage ? (
           <span className={`hidden text-xs md:inline ${exportTone}`}>
-            {renderMessage}
+            {renderState === 'rendering' ? `${progressPercent}% - ${renderMessage}` : renderMessage}
           </span>
         ) : null}
         <Button

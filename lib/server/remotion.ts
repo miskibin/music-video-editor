@@ -1,18 +1,30 @@
 import path from 'node:path';
 import { bundle } from '@remotion/bundler';
-import { renderMedia, selectComposition } from '@remotion/renderer';
+import { renderMedia, selectComposition, type RenderMediaProgress } from '@remotion/renderer';
 import { RENDER_COMPOSITION_ID, type RenderManifest } from '@/lib/render';
 
 const getEntryPoint = () => path.join(process.cwd(), 'rendering', 'remotion', 'index.ts');
+let bundlePromise: Promise<string> | null = null;
 
-export const getRemotionBundle = () => bundle({
-  entryPoint: getEntryPoint(),
-});
+export const getRemotionBundle = () => {
+  if (!bundlePromise) {
+    bundlePromise = bundle({
+      entryPoint: getEntryPoint(),
+    });
+  }
+
+  return bundlePromise;
+};
 
 export const renderManifestToMp4 = async (
   manifest: RenderManifest,
   outputLocation: string,
+  callbacks?: {
+    onBundleStart?: () => void;
+    onRenderProgress?: (progress: RenderMediaProgress) => void;
+  },
 ) => {
+  callbacks?.onBundleStart?.();
   const serveUrl = await getRemotionBundle();
   const inputProps = { manifest };
   const composition = await selectComposition({
@@ -29,5 +41,6 @@ export const renderManifestToMp4 = async (
     outputLocation,
     inputProps,
     logLevel: 'error',
+    onProgress: callbacks?.onRenderProgress,
   });
 };

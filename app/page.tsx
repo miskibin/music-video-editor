@@ -48,11 +48,19 @@ import {
   waitForAudioReady,
 } from '@/lib/media-utils';
 import { alignSubtitles } from '@/lib/lyric-sync';
-import { sanitizeOutputName } from '@/lib/render';
+import { createRenderManifest, sanitizeOutputName, type RenderManifest } from '@/lib/render';
 
 type AssetBlobMap = Record<string, Blob>;
 type SaveState = 'loading' | 'saving' | 'saved' | 'error';
 type RenderState = 'idle' | 'rendering' | 'success' | 'error';
+type RenderStatusResponse = {
+  jobId: string;
+  state: 'queued' | 'staging' | 'bundling' | 'rendering' | 'completed' | 'error';
+  progress: number;
+  message: string;
+  errorMessage: string | null;
+  downloadUrl: string | null;
+};
 
 const AUDIO_TRACK_ID = 'a1';
 const VIDEO_TRACK_ID = 'v1';
@@ -78,6 +86,7 @@ const getTrackMaxEnd = <T extends { start: number; duration: number }>(items: T[
 );
 
 const nowIso = () => new Date().toISOString();
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const downloadBlob = (blob: Blob, fileName: string) => {
   const url = URL.createObjectURL(blob);
@@ -118,6 +127,7 @@ export default function Editor() {
   const [isSubtitleAlignmentOpen, setIsSubtitleAlignmentOpen] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('loading');
   const [renderState, setRenderState] = useState<RenderState>('idle');
+  const [renderProgress, setRenderProgress] = useState(0);
   const [renderMessage, setRenderMessage] = useState<string | null>(null);
   const [hasHydratedProject, setHasHydratedProject] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -175,7 +185,7 @@ export default function Editor() {
   );
   const subtitleText = useMemo(
     () => activeTextClip?.overlayText ?? '',
-    [activeTextClip, project.subtitles.sourceText],
+    [activeTextClip],
   );
   const subtitleSnapTimes = useMemo(
     () => project.subtitles.cues.map((cue) => cue.start),
@@ -212,6 +222,13 @@ export default function Editor() {
     const musicAssetId = project.music.clip?.assetId;
     return renderState === 'rendering' || !musicAssetId || !assetBlobs[musicAssetId];
   }, [assetBlobs, project.music.clip?.assetId, renderState]);
+  const renderPreviewManifest = useMemo<RenderManifest | null>(() => {
+    try {
+      return createRenderManifest(project, assetUrls);
+    } catch {
+      return null;
+    }
+  }, [assetUrls, project]);
 
   const persistNow = useCallback(async (nextProject: typeof project, nextAssetBlobs: AssetBlobMap) => {
     try {
@@ -278,6 +295,25 @@ export default function Editor() {
     void persistNow(projectRef.current, assetBlobsRef.current);
   }, [persistNow]);
 
+  const handleNewProject = useCallback(() => {
+    if (!window.confirm('Start a new project? The current timeline will be cleared and replaced with a blank project.')) {
+      return;
+    }
+
+    stopPlayback();
+    subtitleAlignmentRequestIdRef.current += 1;
+    const nextProject = createDefaultProject();
+    setProject(nextProject);
+    setAssetBlobs({});
+    setSelectedClipId(null);
+    setCurrentTime(0);
+    setIsSubtitleAlignmentOpen(false);
+    setRenderState('idle');
+    setRenderProgress(0);
+    setRenderMessage(null);
+    void persistNow(nextProject, {});
+  }, [persistNow, stopPlayback]);
+
   const handleExport = useCallback(async () => {
     if (renderState === 'rendering') {
       return;
@@ -293,6 +329,7 @@ export default function Editor() {
 
     try {
       setRenderState('rendering');
+      setRenderProgress(0.02);
       setRenderMessage('Preparing render request...');
 
       const formData = new FormData();
@@ -315,16 +352,16 @@ export default function Editor() {
         formData.append(`asset:${assetId}`, file, asset.name);
       }
 
-      const response = await fetch('/api/render', {
+      const startResponse = await fetch('/api/render', {
         method: 'POST',
         body: formData,
       });
 
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type') ?? '';
+      if (!startResponse.ok) {
+        const contentType = startResponse.headers.get('content-type') ?? '';
         const responseBody = contentType.includes('application/json')
-          ? await response.json()
-          : await response.text();
+          ? await startResponse.json()
+          : await startResponse.text();
         const errorMessage = typeof responseBody === 'object'
           && responseBody !== null
           && 'detail' in responseBody
@@ -334,13 +371,51 @@ export default function Editor() {
         throw new Error(errorMessage);
       }
 
-      const videoBlob = await response.blob();
+      const {
+        statusUrl,
+        downloadUrl,
+      } = await startResponse.json() as {
+        jobId: string;
+        statusUrl: string;
+        downloadUrl: string;
+      };
+
+      let resolvedDownloadUrl = downloadUrl;
+      while (true) {
+        await sleep(750);
+        const statusResponse = await fetch(statusUrl, { cache: 'no-store' });
+        if (!statusResponse.ok) {
+          throw new Error('Lost connection to render job status.');
+        }
+
+        const status = await statusResponse.json() as RenderStatusResponse;
+        setRenderProgress(status.progress);
+        setRenderMessage(status.message);
+
+        if (status.state === 'error') {
+          throw new Error(status.errorMessage ?? status.message ?? 'Render failed.');
+        }
+
+        if (status.state === 'completed' && status.downloadUrl) {
+          resolvedDownloadUrl = status.downloadUrl;
+          break;
+        }
+      }
+
+      const downloadResponse = await fetch(resolvedDownloadUrl, { cache: 'no-store' });
+      if (!downloadResponse.ok) {
+        throw new Error('Render finished, but the download could not be retrieved.');
+      }
+
+      const videoBlob = await downloadResponse.blob();
       const fileName = `${sanitizeOutputName(currentProject.name)}.mp4`;
       downloadBlob(videoBlob, fileName);
       setRenderState('success');
+      setRenderProgress(1);
       setRenderMessage(`Downloaded ${fileName}.`);
     } catch (error) {
       setRenderState('error');
+      setRenderProgress(0);
       setRenderMessage(error instanceof Error ? error.message : 'Render failed.');
     }
   }, [renderState]);
@@ -823,8 +898,10 @@ export default function Editor() {
         musicBpm={musicClip?.bpm ?? null}
         saveState={saveState}
         renderState={renderState}
+        renderProgress={renderProgress}
         renderMessage={renderMessage}
         onSave={handleSave}
+        onNewProject={handleNewProject}
         onExport={handleExport}
         onOpenSubtitleAlignment={handleOpenSubtitleAlignment}
         subtitleAlignmentStatus={project.lyricSync.subtitleAlignment.status}
@@ -861,10 +938,7 @@ export default function Editor() {
                   <div className="flex min-h-0 flex-1 items-center justify-center">
                     <VideoPreview
                       currentTime={currentTime}
-                      isPlaying={isPlaying}
-                      visualClip={activeVisualClip}
-                      subtitleText={subtitleText}
-                      beatBpm={musicClip?.bpm ?? null}
+                      manifest={renderPreviewManifest}
                     />
                   </div>
                 </div>
