@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  let body: { apiKey?: string; query?: string; page?: number };
+  let body: { apiKey?: string; query?: string; page?: number; perPage?: number };
   try {
     body = await req.json();
   } catch {
@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
   const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
   const query = typeof body.query === 'string' ? body.query.trim() : '';
   const page = typeof body.page === 'number' && body.page >= 1 ? Math.floor(body.page) : 1;
+  const rawPerPage = typeof body.perPage === 'number' ? body.perPage : 15;
+  const perPage = Math.min(200, Math.max(3, Math.floor(rawPerPage)));
 
   if (!apiKey) {
     return NextResponse.json({ error: 'Pixabay API key is required' }, { status: 400 });
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
   url.searchParams.set('key', apiKey);
   url.searchParams.set('q', query);
   url.searchParams.set('image_type', 'photo');
-  url.searchParams.set('per_page', '20');
+  url.searchParams.set('per_page', String(perPage));
   url.searchParams.set('page', String(page));
   url.searchParams.set('safesearch', 'true');
 

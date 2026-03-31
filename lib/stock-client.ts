@@ -12,11 +12,17 @@ export async function searchPexelsStock(
   apiKey: string,
   query: string,
   page = 1,
+  perPage = 15,
 ): Promise<StockSearchItem[]> {
   const res = await fetch('/api/stock/pexels', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey: apiKey.trim(), query: query.trim(), page }),
+    body: JSON.stringify({
+      apiKey: apiKey.trim(),
+      query: query.trim(),
+      page,
+      perPage: Math.min(80, Math.max(1, Math.floor(perPage))),
+    }),
   });
   const data = (await res.json()) as { items?: StockSearchItem[]; error?: string; detail?: string };
   if (!res.ok) {
@@ -30,11 +36,17 @@ export async function searchPixabayStock(
   apiKey: string,
   query: string,
   page = 1,
+  perPage = 15,
 ): Promise<StockSearchItem[]> {
   const res = await fetch('/api/stock/pixabay', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey: apiKey.trim(), query: query.trim(), page }),
+    body: JSON.stringify({
+      apiKey: apiKey.trim(),
+      query: query.trim(),
+      page,
+      perPage: Math.min(200, Math.max(3, Math.floor(perPage))),
+    }),
   });
   const data = (await res.json()) as { items?: StockSearchItem[]; error?: string; detail?: string };
   if (!res.ok) {

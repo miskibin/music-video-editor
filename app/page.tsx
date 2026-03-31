@@ -1179,6 +1179,73 @@ export default function Editor() {
     });
   }, [pollRenderJob]);
 
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+
+      if (target.isContentEditable) {
+        return true;
+      }
+
+      const tag = target.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+        return true;
+      }
+
+      return Boolean(target.closest('[contenteditable="true"]'));
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+
+      if (isSubtitleAlignmentOpen) {
+        return;
+      }
+
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      if (event.code === 'Space') {
+        event.preventDefault();
+        if (musicClip?.assetUrl) {
+          if (isPlaying) {
+            handlePause();
+          } else {
+            void handlePlay();
+          }
+        }
+        return;
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedClipId) {
+          event.preventDefault();
+          handleDeleteClip(selectedClipId);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    handleDeleteClip,
+    handlePause,
+    handlePlay,
+    isPlaying,
+    isSubtitleAlignmentOpen,
+    musicClip?.assetUrl,
+    selectedClipId,
+  ]);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 font-sans text-zinc-50">
       <TopBar
