@@ -147,11 +147,13 @@ This phase established the UI foundation: a fixed three-track timeline metaphor,
 
 ### Phase 2: Structured Project Model
 
-Current phase.
+Foundation phase, largely in place.
 
 This phase moves the app from a loose prototype into a product-shaped editor. The frontend now uses a versioned project document, a fixed three-layer data model, a persisted single active project, saved asset blobs, and uploaded background video support. The remaining work in this phase is hardening the model, improving the editor around that model, and keeping the project schema stable as backend-assisted workflows expand.
 
 ### Phase 3: Lyric Sync and Media Discovery
+
+Current phase.
 
 This phase adds the first real backend workflows. The first slice is now in place as a draft Lyric Sync flow for lyrics timing review. The remaining work in this phase is replacing the heuristic aligner with real audio-aware alignment, then adding scene planning and media discovery from lyrics plus user direction.
 
