@@ -1,6 +1,9 @@
+export type StockMediaKind = 'photo' | 'video';
+
 export type StockSearchItem = {
   id: string;
   source: 'pexels' | 'pixabay';
+  kind: StockMediaKind;
   previewUrl: string;
   downloadUrl: string;
   width: number;
@@ -13,6 +16,7 @@ export async function searchPexelsStock(
   query: string,
   page = 1,
   perPage = 15,
+  mode: StockMediaKind = 'photo',
 ): Promise<StockSearchItem[]> {
   const res = await fetch('/api/stock/pexels', {
     method: 'POST',
@@ -22,6 +26,7 @@ export async function searchPexelsStock(
       query: query.trim(),
       page,
       perPage: Math.min(80, Math.max(1, Math.floor(perPage))),
+      mode,
     }),
   });
   const data = (await res.json()) as { items?: StockSearchItem[]; error?: string; detail?: string };
@@ -37,6 +42,7 @@ export async function searchPixabayStock(
   query: string,
   page = 1,
   perPage = 15,
+  mode: StockMediaKind = 'photo',
 ): Promise<StockSearchItem[]> {
   const res = await fetch('/api/stock/pixabay', {
     method: 'POST',
@@ -46,6 +52,7 @@ export async function searchPixabayStock(
       query: query.trim(),
       page,
       perPage: Math.min(200, Math.max(3, Math.floor(perPage))),
+      mode,
     }),
   });
   const data = (await res.json()) as { items?: StockSearchItem[]; error?: string; detail?: string };
@@ -56,7 +63,7 @@ export async function searchPixabayStock(
   return data.items ?? [];
 }
 
-export async function fetchStockImageBlob(downloadUrl: string): Promise<Blob> {
+export async function fetchStockMediaBlob(downloadUrl: string): Promise<Blob> {
   const res = await fetch('/api/stock/fetch-image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -64,7 +71,7 @@ export async function fetchStockImageBlob(downloadUrl: string): Promise<Blob> {
   });
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(data.error ?? 'Could not download image');
+    throw new Error(data.error ?? 'Could not download media');
   }
   return res.blob();
 }

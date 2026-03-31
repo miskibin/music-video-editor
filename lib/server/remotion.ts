@@ -6,6 +6,26 @@ import { RENDER_COMPOSITION_ID, type RenderManifest } from '../render';
 const getEntryPoint = () => path.join(process.cwd(), 'rendering', 'remotion', 'index.ts');
 let bundlePromise: Promise<string> | null = null;
 
+const debugLog = (payload: {
+  runId: string;
+  hypothesisId: string;
+  location: string;
+  message: string;
+  data?: Record<string, unknown>;
+}) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7519/ingest/94b95f73-1e6f-469d-99e1-3b8fd84e110f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '35e18a' },
+    body: JSON.stringify({
+      sessionId: '35e18a',
+      timestamp: Date.now(),
+      ...payload,
+    }),
+  }).catch(() => {});
+  // #endregion
+};
+
 export const getRemotionBundle = () => {
   if (!bundlePromise) {
     bundlePromise = bundle({
@@ -25,7 +45,26 @@ export const renderManifestToMp4 = async (
   },
 ) => {
   callbacks?.onBundleStart?.();
+  debugLog({
+    runId: 'pre-fix',
+    hypothesisId: 'D',
+    location: 'lib/server/remotion.ts:renderManifestToMp4:bundle-start',
+    message: 'Remotion bundle requested',
+    data: {
+      outputLocation,
+      durationInFrames: manifest.durationInFrames,
+      fps: manifest.fps,
+      assetSourceCount: Object.keys(manifest.assetSources ?? {}).length,
+    },
+  });
   const serveUrl = await getRemotionBundle();
+  debugLog({
+    runId: 'pre-fix',
+    hypothesisId: 'D',
+    location: 'lib/server/remotion.ts:renderManifestToMp4:bundle-ready',
+    message: 'Remotion bundle ready',
+    data: { serveUrl },
+  });
   const inputProps = { manifest };
   const composition = await selectComposition({
     serveUrl,
