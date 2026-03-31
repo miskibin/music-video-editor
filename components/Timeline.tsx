@@ -21,7 +21,6 @@ interface Props {
   onTimeChange: (time: number) => void;
   isPlaying: boolean;
   hasPlayableAudio: boolean;
-  activeAudioClipId: string | null;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -42,7 +41,6 @@ export default function Timeline({
   onTimeChange,
   isPlaying,
   hasPlayableAudio,
-  activeAudioClipId,
   onPlay,
   onPause,
   onStop,
@@ -297,9 +295,6 @@ export default function Timeline({
             clips={clipsByTrack.get(track.id) || EMPTY_CLIPS}
             selectedClipId={selectedClipId}
             pixelsPerSecond={pixelsPerSecond}
-            activeAudioClipId={activeAudioClipId}
-            waveformTime={isPlaying ? currentTime : undefined}
-            isWaveformAnimating={isPlaying}
             onSelectClip={onSelectClip}
             onChangeClip={onChangeClip}
             onDragEnd={onDragEnd}

@@ -65,9 +65,6 @@ interface Props {
   onSelect: (id: string) => void;
   onChange: (id: string, updates: Partial<Clip>) => void;
   onDragEnd: (id: string) => void;
-  waveformTime?: number;
-  isWaveformAnimating?: boolean;
-  isActiveAudioClip?: boolean;
 }
 
 function TimelineClip({
@@ -77,9 +74,6 @@ function TimelineClip({
   onSelect,
   onChange,
   onDragEnd,
-  waveformTime = 0,
-  isWaveformAnimating = false,
-  isActiveAudioClip = false,
 }: Props) {
   const isAudioClip = clip.trackId.startsWith('a');
   const dragStateRef = React.useRef<DragState | null>(null);
@@ -223,11 +217,8 @@ function TimelineClip({
       return [];
     }
 
-    return waveform.map((bar, index) => {
-      const phase = isWaveformAnimating ? (Math.sin(waveformTime * 7 + index * 0.65) + 1) / 2 : 0.22;
-      return 20 + bar * 62 * (0.5 + phase * 0.7);
-    });
-  }, [clip.waveform, isAudioClip, isWaveformAnimating, waveformTime]);
+    return waveform.map((bar) => Math.max(14, 18 + bar * 64));
+  }, [clip.waveform, isAudioClip]);
 
   return (
     <div
@@ -270,24 +261,12 @@ function TimelineClip({
 }
 
 function areClipPropsEqual(previous: Props, next: Props) {
-  if (
-    previous.clip !== next.clip
-    || previous.selected !== next.selected
-    || previous.pixelsPerSecond !== next.pixelsPerSecond
-    || previous.onSelect !== next.onSelect
-    || previous.onChange !== next.onChange
-    || previous.onDragEnd !== next.onDragEnd
-    || previous.isActiveAudioClip !== next.isActiveAudioClip
-    || previous.isWaveformAnimating !== next.isWaveformAnimating
-  ) {
-    return false;
-  }
-
-  if (!previous.isWaveformAnimating && !next.isWaveformAnimating) {
-    return true;
-  }
-
-  return previous.waveformTime === next.waveformTime;
+  return previous.clip === next.clip
+    && previous.selected === next.selected
+    && previous.pixelsPerSecond === next.pixelsPerSecond
+    && previous.onSelect === next.onSelect
+    && previous.onChange === next.onChange
+    && previous.onDragEnd === next.onDragEnd;
 }
 
 export default React.memo(TimelineClip, areClipPropsEqual);

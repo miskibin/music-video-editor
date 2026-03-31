@@ -550,7 +550,6 @@ export default function Editor() {
               onTimeChange={handleTimeChange}
               isPlaying={isPlaying}
               hasPlayableAudio={Boolean(activeAudioClip?.assetUrl)}
-              activeAudioClipId={activeAudioClip?.id ?? null}
               onPlay={handlePlay}
               onPause={handlePause}
               onStop={stopPlayback}

@@ -24,9 +24,6 @@ interface Props {
   clips: Clip[];
   selectedClipId: string | null;
   pixelsPerSecond: number;
-  activeAudioClipId: string | null;
-  waveformTime?: number;
-  isWaveformAnimating: boolean;
   onSelectClip: (id: string | null) => void;
   onChangeClip: (id: string, updates: Partial<Clip>) => void;
   onDragEnd: (id: string) => void;
@@ -38,9 +35,6 @@ function TimelineTrack({
   clips,
   selectedClipId,
   pixelsPerSecond,
-  activeAudioClipId,
-  waveformTime,
-  isWaveformAnimating,
   onSelectClip,
   onChangeClip,
   onDragEnd,
@@ -73,9 +67,6 @@ function TimelineTrack({
             clip={clip}
             selected={clip.id === selectedClipId}
             pixelsPerSecond={pixelsPerSecond}
-            waveformTime={clip.id === activeAudioClipId ? waveformTime : undefined}
-            isWaveformAnimating={clip.id === activeAudioClipId && isWaveformAnimating}
-            isActiveAudioClip={clip.id === activeAudioClipId}
             onSelect={onSelectClip}
             onChange={onChangeClip}
             onDragEnd={onDragEnd}
@@ -87,31 +78,14 @@ function TimelineTrack({
 }
 
 function areTrackPropsEqual(previous: Props, next: Props) {
-  if (
-    previous.track !== next.track
-    || previous.width !== next.width
-    || previous.clips !== next.clips
-    || previous.selectedClipId !== next.selectedClipId
-    || previous.pixelsPerSecond !== next.pixelsPerSecond
-    || previous.activeAudioClipId !== next.activeAudioClipId
-    || previous.isWaveformAnimating !== next.isWaveformAnimating
-    || previous.onSelectClip !== next.onSelectClip
-    || previous.onChangeClip !== next.onChangeClip
-    || previous.onDragEnd !== next.onDragEnd
-  ) {
-    return false;
-  }
-
-  const previousHasAnimatedClip = previous.isWaveformAnimating
-    && previous.clips.some((clip) => clip.id === previous.activeAudioClipId);
-  const nextHasAnimatedClip = next.isWaveformAnimating
-    && next.clips.some((clip) => clip.id === next.activeAudioClipId);
-
-  if (!previousHasAnimatedClip && !nextHasAnimatedClip) {
-    return true;
-  }
-
-  return previous.waveformTime === next.waveformTime;
+  return previous.track === next.track
+    && previous.width === next.width
+    && previous.clips === next.clips
+    && previous.selectedClipId === next.selectedClipId
+    && previous.pixelsPerSecond === next.pixelsPerSecond
+    && previous.onSelectClip === next.onSelectClip
+    && previous.onChangeClip === next.onChangeClip
+    && previous.onDragEnd === next.onDragEnd;
 }
 
 export default React.memo(TimelineTrack, areTrackPropsEqual);
