@@ -54,6 +54,34 @@ class SubtitleAlignmentResponse(BaseModel):
     cues: list[SubtitleCueResponse]
 
 
+class AudioAnalysisRequest(BaseModel):
+    minSectionDuration: float = Field(default=8.0, ge=2.0, le=60.0)
+    maxSections: int = Field(default=12, ge=2, le=24)
+
+
+class AudioAnalysisPointResponse(BaseModel):
+    time: float
+    value: float
+
+
+class AudioAnalysisSectionResponse(BaseModel):
+    start: float
+    end: float
+    duration: float
+
+
+class AudioAnalysisResponse(BaseModel):
+    provider: str
+    generatedAt: str
+    duration: float
+    sampleRate: int
+    bpm: float
+    beatGrid: list[float]
+    onsetStrength: list[AudioAnalysisPointResponse]
+    sectionBoundaries: list[float]
+    sections: list[AudioAnalysisSectionResponse]
+
+
 app = FastAPI(title="Music Video Backend", version="0.1.0")
 
 app.add_middleware(
@@ -157,9 +185,70 @@ def _align_subtitles(request: SubtitleAlignmentRequest, audio_path: str) -> Subt
     )
 
 
+def _analyze_audio(request: AudioAnalysisRequest, audio_path: str) -> AudioAnalysisResponse:
+    from audio_analysis import analyze_audio_structure
+
+    analysis = analyze_audio_structure(
+        audio_path,
+        min_section_duration=request.minSectionDuration,
+        max_sections=request.maxSections,
+    )
+    return AudioAnalysisResponse(
+        provider="librosa",
+        generatedAt=datetime.now(timezone.utc).isoformat(),
+        **analysis,
+    )
+
+
+async def _persist_upload(audio: UploadFile) -> str:
+    suffix = Path(audio.filename or "audio.bin").suffix or ".bin"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        path = tmp.name
+        tmp.write(await audio.read())
+    return path
+
+
 @app.get("/api/health")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/audio/analysis", response_model=AudioAnalysisResponse)
+async def analyze_audio(request: Request) -> AudioAnalysisResponse:
+    if "multipart/form-data" not in request.headers.get("content-type", "").lower():
+        raise HTTPException(status_code=400, detail="Send multipart/form-data with audio and optional minSectionDuration, maxSections.")
+
+    form = await request.form()
+    audio = form.get("audio")
+    if not isinstance(audio, UploadFile):
+        raise HTTPException(status_code=400, detail="Missing audio file field.")
+
+    min_section_duration = form.get("minSectionDuration", "8")
+    max_sections = form.get("maxSections", "12")
+    if not isinstance(min_section_duration, str) or not isinstance(max_sections, str):
+        raise HTTPException(status_code=400, detail="minSectionDuration and maxSections must be strings when provided.")
+
+    try:
+        analysis_request = AudioAnalysisRequest(
+            minSectionDuration=float(min_section_duration),
+            maxSections=int(max_sections),
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    path = await _persist_upload(audio)
+    logger.info(
+        "Analyze audio: minSectionDuration={} maxSections={}",
+        analysis_request.minSectionDuration,
+        analysis_request.maxSections,
+    )
+    try:
+        return _analyze_audio(analysis_request, path)
+    except Exception as exc:
+        logger.exception("Audio analysis failed")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        os.unlink(path)
 
 
 @app.post("/api/lyric-sync/subtitles/align", response_model=SubtitleAlignmentResponse)
@@ -191,10 +280,7 @@ async def align_subtitles(request: Request) -> SubtitleAlignmentResponse:
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    suffix = Path(audio.filename or "audio.bin").suffix or ".bin"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        path = tmp.name
-        tmp.write(await audio.read())
+    path = await _persist_upload(audio)
 
     logger.info(
         "Align: lang={} excerpt={}-{}s",

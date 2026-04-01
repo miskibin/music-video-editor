@@ -14,7 +14,7 @@
   "dependencies": {
     "@google/genai": "^1.17.0",
     "@hookform/resolvers": "^5.2.1",
-    "@remotion/bundler": "^4.0.443",
+    "@remotion/bundler": "^4.0.438",
     "@remotion/media": "^4.0.443",
     "@remotion/media-utils": "^4.0.443",
     "@remotion/player": "^4.0.443",

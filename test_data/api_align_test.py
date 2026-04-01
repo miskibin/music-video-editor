@@ -37,7 +37,7 @@ def main() -> None:
             data={
                 "language": "pl",
                 "excerptStart": "0",
-                "excerptEnd": "45",
+                "excerptEnd": "148",
                 "sourceText": text,
             },
             timeout=900,

@@ -1,0 +1,11 @@
+tempo: 94bpm
+
+structure:
+
+Intro: 0-12s
+verse 1: 12-38
+chorus: 38-1:00
+guitar solo: 1:00 - 1:19
+verse 2: 1:19-1:44
+chorus 1:44-2:06
+solo: 2:06-2:27

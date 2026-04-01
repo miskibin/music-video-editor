@@ -12,7 +12,7 @@ Create a focused editor and export pipeline for short-form music videos where mu
 
 ## Current Status
 
-As of March 2026, the project is moving from Phase 2 into the first slice of Phase 3.
+As of March 2026, the project has moved beyond the initial editor prototype and into backend-assisted timing workflows.
 
 The app is no longer just a visual prototype. It now has a structured frontend project model for the fixed three-layer editor, local project persistence in the browser, support for both background images and background videos, and the first draft of a backend-assisted Lyric Sync workflow for subtitle timing review.
 
@@ -31,8 +31,7 @@ What works now:
 What is still missing:
 
 - real audio-based word alignment from Whisper or forced alignment
-- scene planning and media discovery workflows behind the Lyric Sync phase
-- AI sourcing or generation of background media
+- scene planning and media discovery workflows behind the Lyric Sync flow
 - real transition controls and music-reactive motion controls beyond the current schema placeholders
 - Remotion render pipeline
 - FFmpeg ingest and post-processing pipeline
@@ -48,9 +47,7 @@ These are hard constraints for the product scope:
    - music
    - subtitles
    - background image or video
-4. The background layer can come from either:
-   - user-uploaded media
-   - AI-assisted media selection or generation based on lyrics plus a user prompt
+4. The background layer can come from user-uploaded media.
 5. The visual layer supports simple transitions and optional music-reactive motion.
 6. Export format is MP4.
 
@@ -61,8 +58,6 @@ These are hard constraints for the product scope:
 3. The system aligns each word to the audio using a Whisper-like transcription or forced-alignment step.
 4. The user chooses how the background visuals should be created:
    - upload their own image or video
-   - let AI find open-source visuals based on lyric meaning and prompt context
-   - let AI generate visuals when suitable
 5. The user selects a small set of transitions and optional music-reactive behavior such as zooming on kicks or other beat-driven moments.
 6. The system renders and exports a vertical MP4.
 
@@ -86,19 +81,22 @@ The editor should stay intentionally narrow:
 
 This keeps the product simple, predictable, and optimized for one use case instead of becoming a general-purpose video editor.
 
-### 4. AI-Assisted Background Visuals
+### 4. Cut Scoring Algorithm
 
-When the user does not upload their own media, the system should construct a prompt from:
+Click the different ranges and watch the algorithm redistribute cuts.
 
-- the lyrics
-- the user's creative direction
-- optional song mood, genre, tempo, or theme cues
+Here's how the scoring logic works - every second in the song gets candidate cut points scored on a weighted system:
 
-That prompt can then be used to:
+- **Section boundary** -> +10 (highest - always try to cut at verse/chorus transitions)
+- **Held word end** -> +7 (the `~` tilde words - cut right after the note releases)
+- **Energy peak** -> +6 (the waveform surges, perfect moment for a visual impact)
+- **Lyric line end** -> +5 (natural phrase break)
+- **Bar 1 beat** -> +4 x energy (beat 1 of every 4-beat bar, weighted by how loud that section is)
+- **Regular beat onset** -> +2 x energy
 
-- search open-source image and video sources
-- rank candidate assets
-- generate new images or videos with AI
+Then when you pick a range like 9-15, the algorithm tries every N in that range, selects the highest-scoring non-overlapping candidates with a minimum gap enforced, and picks whichever N gave the best total score without any clip being shorter than ~2 seconds.
+
+The cut list at the bottom shows you exactly *why* each cut was placed there. Ready to wire this into the real librosa pipeline?
 
 ### 5. Music-Reactive Motion
 
@@ -125,7 +123,7 @@ At a high level, the product is best split into these stages:
 1. Ingest the music, lyrics, and optional user media.
 2. Align lyrics to audio with word-level timestamps.
 3. Build the three-layer composition data.
-4. Source or generate background visuals from lyrics and prompt context.
+4. Prepare and place user-provided background visuals.
 5. Apply simple transitions and beat-reactive motion.
 6. Render to vertical MP4.
 
@@ -137,40 +135,12 @@ The stack should use both tools, but for different responsibilities.
 - FFmpeg should handle media processing: probing uploads, re-encoding incompatible files, trimming or normalizing source media, preparing proxy assets, and optimizing the final MP4.
 - Word-level lyric alignment should live in the backend, not in Remotion or FFmpeg directly. That service should output timestamped JSON which Remotion can render.
 
-## Product Phases
-
-### Phase 1: Editor Prototype
-
-Completed.
-
-This phase established the UI foundation: a fixed three-track timeline metaphor, a 9:16 preview, basic clip editing, music upload and playback, waveform generation, subtitle cue editing, and background media placement.
-
-### Phase 2: Structured Project Model
-
-Foundation phase, largely in place.
-
-This phase moves the app from a loose prototype into a product-shaped editor. The frontend now uses a versioned project document, a fixed three-layer data model, a persisted single active project, saved asset blobs, and uploaded background video support. The remaining work in this phase is hardening the model, improving the editor around that model, and keeping the project schema stable as backend-assisted workflows expand.
-
-### Phase 3: Lyric Sync and Media Discovery
-
-Current phase.
-
-This phase adds the first real backend workflows. The first slice is now in place as a draft Lyric Sync flow for lyrics timing review. The remaining work in this phase is replacing the heuristic aligner with real audio-aware alignment, then adding scene planning and media discovery from lyrics plus user direction.
-
-### Phase 4: Motion and Rendering
-
-Introduce the actual video composition pipeline. This phase should use Remotion to render timed subtitles, background sequences, transitions, and music-reactive motion such as kick-based zooms or pulse effects.
-
-### Phase 5: Export and Production Hardening
-
-Finish the delivery pipeline. This phase should use FFmpeg to normalize media inputs, handle final post-processing, and export a stable TikTok-ready MP4 while adding reliability, validation, and quality controls around the full workflow.
-
 ## Development Focus
 
 The current implementation should prioritize:
 
 1. replacing the draft Lyric Sync heuristic with real lyric-to-audio alignment and word-level timestamps
-2. adding scene planning and AI-assisted background media sourcing and generation
+2. improving cut-planning quality and timeline tooling around the scoring logic
 3. hardening the project model and persistence flow around the new backend workflows
 4. implementing the Remotion composition pipeline from the saved project document
 5. adding FFmpeg preprocessing and final MP4 export
