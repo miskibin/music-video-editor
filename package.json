@@ -14,6 +14,8 @@
   "dependencies": {
     "@google/genai": "^1.17.0",
     "@hookform/resolvers": "^5.2.1",
+    "@langchain/core": "^1.1.38",
+    "@langchain/openai": "^1.4.1",
     "@remotion/bundler": "^4.0.438",
     "@remotion/media": "^4.0.443",
     "@remotion/media-utils": "^4.0.443",
@@ -24,6 +26,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "idb": "^8.0.3",
+    "langchain": "^1.2.39",
     "lucide-react": "^0.553.0",
     "motion": "^12.23.24",
     "next": "16.2.1",

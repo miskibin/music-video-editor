@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { ImageIcon, KeyRound, Loader2, Music, Search, Trash2, Video } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,7 +15,15 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  clearSavedLlmSettings,
+  readSavedLlmSettings,
+  saveLlmSettings,
+  testLlmConnection,
+  type SavedLlmSettings,
+} from '@/lib/llm-client';
 import type { AssetRecord } from '@/lib/types';
 import { setMediaGalleryDragData } from '@/lib/media-drag';
 import {
@@ -161,8 +170,19 @@ function MediaGalleryPanel({
   const [apiDialogOpen, setApiDialogOpen] = useState(false);
   const [pexelsDraft, setPexelsDraft] = useState('');
   const [pixabayDraft, setPixabayDraft] = useState('');
+  const [llmBaseUrlDraft, setLlmBaseUrlDraft] = useState('');
+  const [llmApiKeyDraft, setLlmApiKeyDraft] = useState('');
+  const [llmModelDraft, setLlmModelDraft] = useState('');
   const [hasPexelsSaved, setHasPexelsSaved] = useState(false);
   const [hasPixabaySaved, setHasPixabaySaved] = useState(false);
+  const [savedLlmSettings, setSavedLlmSettings] = useState<SavedLlmSettings>({
+    baseUrl: null,
+    apiKey: null,
+    model: null,
+  });
+  const [testingLlmConnection, setTestingLlmConnection] = useState(false);
+  const [llmTestStatus, setLlmTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [llmTestMessage, setLlmTestMessage] = useState<string | null>(null);
 
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -180,10 +200,17 @@ function MediaGalleryPanel({
       return;
     }
     const { pexels, pixabay } = readStockKeys();
+    const nextLlmSettings = readSavedLlmSettings();
     setHasPexelsSaved(Boolean(pexels));
     setHasPixabaySaved(Boolean(pixabay));
+    setSavedLlmSettings(nextLlmSettings);
     setPexelsDraft('');
     setPixabayDraft('');
+    setLlmBaseUrlDraft(nextLlmSettings.baseUrl ?? '');
+    setLlmApiKeyDraft('');
+    setLlmModelDraft(nextLlmSettings.model ?? '');
+    setLlmTestStatus('idle');
+    setLlmTestMessage(null);
   }, [apiDialogOpen]);
 
   useEffect(() => {
@@ -313,11 +340,22 @@ function MediaGalleryPanel({
     if (pixabayDraft.trim()) {
       window.localStorage.setItem(PIXABAY_KEY_STORAGE, pixabayDraft.trim());
     }
+
+    saveLlmSettings({
+      baseUrl: llmBaseUrlDraft,
+      apiKey: llmApiKeyDraft,
+      model: llmModelDraft,
+    });
+
+    const nextLlmSettings = readSavedLlmSettings();
+
     setPexelsDraft('');
     setPixabayDraft('');
+    setSavedLlmSettings(nextLlmSettings);
+    setLlmApiKeyDraft('');
     setKeysTick((k) => k + 1);
     setApiDialogOpen(false);
-  }, [pexelsDraft, pixabayDraft]);
+  }, [llmApiKeyDraft, llmBaseUrlDraft, llmModelDraft, pexelsDraft, pixabayDraft]);
 
   const handleRemovePexelsKey = useCallback(() => {
     window.localStorage.removeItem(PEXELS_KEY_STORAGE);
@@ -330,6 +368,58 @@ function MediaGalleryPanel({
     setHasPixabaySaved(false);
     setKeysTick((k) => k + 1);
   }, []);
+
+  const handleClearSavedLlmSettings = useCallback(() => {
+    clearSavedLlmSettings();
+    setSavedLlmSettings({ baseUrl: null, apiKey: null, model: null });
+    setLlmBaseUrlDraft('');
+    setLlmApiKeyDraft('');
+    setLlmModelDraft('');
+    setLlmTestStatus('idle');
+    setLlmTestMessage(null);
+    setKeysTick((k) => k + 1);
+  }, []);
+
+  const handleTestLlmConnection = useCallback(async () => {
+    const baseUrl = llmBaseUrlDraft.trim();
+    const apiKey = llmApiKeyDraft.trim() || (savedLlmSettings.apiKey ?? '');
+    const model = llmModelDraft.trim();
+
+    if (!apiKey) {
+      const message = 'Add an LLM API key or save one first.';
+      setLlmTestStatus('error');
+      setLlmTestMessage(message);
+      toast.error(message);
+      return;
+    }
+
+    if (!model) {
+      const message = 'LLM model name is required.';
+      setLlmTestStatus('error');
+      setLlmTestMessage(message);
+      toast.error(message);
+      return;
+    }
+
+    setTestingLlmConnection(true);
+    setLlmTestStatus('idle');
+    setLlmTestMessage(null);
+
+    try {
+      const result = await testLlmConnection({ baseUrl, apiKey, model });
+      const message = `Connected to ${result.model}.`;
+      setLlmTestStatus('success');
+      setLlmTestMessage(message);
+      toast.success(message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'LLM connection test failed';
+      setLlmTestStatus('error');
+      setLlmTestMessage(message);
+      toast.error(message);
+    } finally {
+      setTestingLlmConnection(false);
+    }
+  }, [llmApiKeyDraft, llmBaseUrlDraft, llmModelDraft, savedLlmSettings.apiKey]);
 
   const handleImportStock = useCallback(
     async (item: StockSearchItem) => {
@@ -370,6 +460,15 @@ function MediaGalleryPanel({
     }
     const { pexels, pixabay } = readStockKeys();
     return Boolean(pexels || pixabay);
+  }, [keysTick]);
+
+  const llmConfigured = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    const { apiKey, model } = readSavedLlmSettings();
+    return Boolean(apiKey && model);
   }, [keysTick]);
 
   const renderAssetCard = (asset: AssetRecord) => {
@@ -454,13 +553,15 @@ function MediaGalleryPanel({
                   size="icon"
                   className="h-7 w-7 text-zinc-500 hover:text-zinc-200"
                   onClick={() => setApiDialogOpen(true)}
-                  aria-label="Stock API keys"
+                  aria-label="API keys and LLM settings"
                 >
                   <KeyRound className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="border-zinc-700 bg-zinc-800 text-zinc-200">
-                {stockConfigured ? 'Stock search keys (saved)' : 'Add Pexels / Pixabay keys for stock search'}
+                {stockConfigured || llmConfigured
+                  ? 'API keys and LLM settings (saved)'
+                  : 'Add stock keys and LLM settings'}
               </TooltipContent>
             </Tooltip>
             <input
@@ -515,15 +616,21 @@ function MediaGalleryPanel({
       </div>
 
       <Dialog open={apiDialogOpen} onOpenChange={setApiDialogOpen}>
-        <DialogContent className="border-zinc-700 bg-zinc-950 sm:max-w-md">
+        <DialogContent className="border-zinc-700 bg-zinc-950 sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-zinc-100">Stock media (Pexels & Pixabay)</DialogTitle>
+            <DialogTitle className="text-zinc-100">API keys and LLM settings</DialogTitle>
             <DialogDescription className="text-zinc-500">
-              Optional keys for Pexels and Pixabay. They are stored only in this browser. Paste a new key to replace an
-              existing one; saved keys are never shown again after you close this dialog.
+              These values are stored only in this browser. Stock provider keys are optional. The LLM test uses the
+              OpenAI-compatible LangChain adapter with your model, API key, and optional base URL.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-zinc-100">Stock media</p>
+                <p className="text-[11px] text-zinc-500">Optional keys for Pexels and Pixabay search.</p>
+              </div>
+            </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-zinc-400">Pexels</Label>
@@ -600,6 +707,92 @@ function MediaGalleryPanel({
               {hasPixabaySaved ? (
                 <p className="text-[10px] text-emerald-600/90">Pixabay key is saved on this device.</p>
               ) : null}
+            </div>
+            <Separator className="bg-zinc-800" />
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-zinc-100">LLM</p>
+                <p className="text-[11px] text-zinc-500">OpenAI-compatible provider via LangChain.</p>
+              </div>
+              {(savedLlmSettings.baseUrl || savedLlmSettings.apiKey || savedLlmSettings.model) ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-[11px] text-rose-400"
+                  onClick={handleClearSavedLlmSettings}
+                >
+                  Clear saved LLM settings
+                </Button>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="llm-base-url" className="text-zinc-400">LLM base URL</Label>
+              <Input
+                id="llm-base-url"
+                type="url"
+                autoComplete="off"
+                placeholder="https://api.openai.com/v1"
+                value={llmBaseUrlDraft}
+                onChange={(e) => setLlmBaseUrlDraft(e.target.value)}
+                className="border-zinc-700 bg-zinc-900/80 text-xs text-zinc-100"
+              />
+              <p className="text-[10px] leading-relaxed text-zinc-500">
+                Leave blank to use the default OpenAI endpoint. Set this for OpenAI-compatible providers.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="llm-api-key" className="text-zinc-400">LLM API key</Label>
+                {savedLlmSettings.apiKey ? (
+                  <span className="text-[10px] text-emerald-600/90">Saved key available for test requests.</span>
+                ) : null}
+              </div>
+              <Input
+                id="llm-api-key"
+                type="password"
+                autoComplete="off"
+                placeholder={savedLlmSettings.apiKey ? 'Paste only to replace saved key' : 'Paste API key once'}
+                value={llmApiKeyDraft}
+                onChange={(e) => setLlmApiKeyDraft(e.target.value)}
+                className="border-zinc-700 bg-zinc-900/80 font-mono text-xs text-zinc-100"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="llm-model" className="text-zinc-400">LLM model name</Label>
+              <Input
+                id="llm-model"
+                type="text"
+                autoComplete="off"
+                placeholder="gpt-4o-mini"
+                value={llmModelDraft}
+                onChange={(e) => setLlmModelDraft(e.target.value)}
+                className="border-zinc-700 bg-zinc-900/80 font-mono text-xs text-zinc-100"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-zinc-200">Connection test</p>
+                <p className={`text-[11px] ${
+                  llmTestStatus === 'error'
+                    ? 'text-rose-400'
+                    : llmTestStatus === 'success'
+                      ? 'text-emerald-400'
+                      : 'text-zinc-500'
+                }`}>
+                  {llmTestMessage ?? 'Runs a short LangChain request against the configured OpenAI-compatible endpoint.'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                className="shrink-0"
+                disabled={testingLlmConnection}
+                onClick={() => void handleTestLlmConnection()}
+              >
+                {testingLlmConnection ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Test connection
+              </Button>
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
