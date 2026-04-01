@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import SubtitleAlignmentModal from '@/components/SubtitleAlignmentModal';
@@ -13,6 +14,7 @@ import {
   BackgroundSegment,
   Clip,
   MusicClip,
+  SplitPartRangePreset,
   SubtitleAlignmentInput,
   SubtitleCue,
   type MotionConfig,
@@ -41,7 +43,9 @@ import {
   parseProjectDocument,
   replaceMusicClip,
   sanitizeProjectAgainstMissingAssets,
+  setSplitPlanningPreset,
   startSubtitleAlignment,
+  storeSplitMarkers,
   storeSubtitleAlignmentError,
   storeSubtitleAlignmentResult,
   updateGlobalBackgroundEffects,
@@ -59,6 +63,11 @@ import {
   persistAssetBlob,
   persistProject,
 } from '@/lib/project-storage';
+import {
+  analyzeAudio,
+  buildSmartSplitMarkers,
+  type AudioAnalysisResult,
+} from '@/lib/audio-analysis';
 import {
   estimateBpmFromAudioUrl,
   extractWaveformPeaks,
@@ -187,6 +196,8 @@ export default function Editor() {
   const [renderState, setRenderState] = useState<RenderState>('idle');
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderMessage, setRenderMessage] = useState<string | null>(null);
+  const [musicAnalysis, setMusicAnalysis] = useState<{ assetId: string; result: AudioAnalysisResult } | null>(null);
+  const [isGeneratingSplitMarkers, setIsGeneratingSplitMarkers] = useState(false);
   const [hasHydratedProject, setHasHydratedProject] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -218,6 +229,14 @@ export default function Editor() {
     () => timelineClips.find((clip) => clip.trackId === AUDIO_TRACK_ID) || null,
     [timelineClips],
   );
+  useEffect(() => {
+    if (!musicClip?.assetId) {
+      setMusicAnalysis(null);
+      return;
+    }
+
+    setMusicAnalysis((current) => (current?.assetId === musicClip.assetId ? current : null));
+  }, [musicClip?.assetId]);
   const sortedTextClips = useMemo(
     () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === TEXT_TRACK_ID)),
     [timelineClips],
@@ -233,6 +252,10 @@ export default function Editor() {
   const subtitleSnapTimes = useMemo(
     () => project.subtitles.cues.map((cue) => cue.start),
     [project.subtitles.cues],
+  );
+  const splitMarkerTimes = useMemo(
+    () => project.splitPlanning.markers.map((marker) => marker.time),
+    [project.splitPlanning.markers],
   );
   const subtitleKaraokeAvailable = useMemo(
     () => project.subtitles.cues.some((cue) => cue.words.length > 0),
@@ -285,6 +308,18 @@ export default function Editor() {
       .filter((a): a is AssetRecord => Boolean(a))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [project, referencedAssetIdsForGallery]);
+
+  const analyzeMusicSource = useCallback(async (audioBlob: Blob, previewUrl: string) => {
+    const [analysisResult, fallbackBpm] = await Promise.all([
+      analyzeAudio(audioBlob, { minSectionDuration: 7, maxSections: 10 }).catch(() => null),
+      estimateBpmFromAudioUrl(previewUrl),
+    ]);
+
+    return {
+      analysisResult,
+      bpm: analysisResult?.bpm ?? fallbackBpm,
+    };
+  }, []);
 
   const persistNow = useCallback(async (nextProject: typeof project, nextAssetBlobs: AssetBlobMap) => {
     try {
@@ -493,6 +528,61 @@ export default function Editor() {
     setIsSubtitleAlignmentOpen(true);
   }, []);
 
+  const handleSplitPresetChange = useCallback((preset: SplitPartRangePreset) => {
+    setProject((currentProject) => setSplitPlanningPreset(currentProject, preset));
+  }, []);
+
+  const handleGenerateSplitMarkers = useCallback(async () => {
+    const currentProject = projectRef.current;
+    const clip = currentProject.music.clip;
+    if (!clip?.assetId) {
+      toast.error('Upload music before generating split markers.');
+      return;
+    }
+
+    const audioBlob = assetBlobsRef.current[clip.assetId];
+    if (!audioBlob) {
+      toast.error('The music file is not available locally anymore.');
+      return;
+    }
+
+    const toastId = toast.loading('Analyzing audio and planning split markers...');
+    setIsGeneratingSplitMarkers(true);
+
+    try {
+      const analysis = musicAnalysis?.assetId === clip.assetId
+        ? musicAnalysis.result
+        : await analyzeAudio(audioBlob, { minSectionDuration: 7, maxSections: 10 });
+
+      setMusicAnalysis({ assetId: clip.assetId, result: analysis });
+
+      const planningCues = currentProject.subtitles.cues.filter(
+        (cue) => cue.words.length > 0 || cue.text.trim() !== 'Your subtitles here',
+      );
+      const markers = buildSmartSplitMarkers({
+        analysis,
+        cues: planningCues,
+        preset: currentProject.splitPlanning.preset,
+        timelineStartSec: clip.start,
+        sourceStartSec: clip.trimStart ?? 0,
+        visibleDurationSec: clip.duration,
+      });
+
+      setProject((nextProject) => storeSplitMarkers(nextProject, nextProject.splitPlanning.preset, markers));
+
+      if (markers.length === 0) {
+        toast.info('No strong split points were found for the current preset.', { id: toastId });
+      } else {
+        toast.success(`Created ${markers.length} split markers.`, { id: toastId });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Split marker generation failed.';
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsGeneratingSplitMarkers(false);
+    }
+  }, [musicAnalysis]);
+
   const handleCloseSubtitleAlignment = useCallback(() => {
     if (projectRef.current.lyricSync.subtitleAlignment.status === 'running') {
       return;
@@ -575,14 +665,14 @@ export default function Editor() {
     const temporaryUrl = URL.createObjectURL(file);
 
     try {
-      const [duration, waveform, bpm] = await Promise.all([
-        getAudioDuration(temporaryUrl),
-        extractWaveformPeaks(temporaryUrl),
-        estimateBpmFromAudioUrl(temporaryUrl),
-      ]);
-      const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
       const assetId = createId();
       const clipId = createId();
+      const [duration, waveform, analysisBundle] = await Promise.all([
+        getAudioDuration(temporaryUrl),
+        extractWaveformPeaks(temporaryUrl),
+        analyzeMusicSource(file, temporaryUrl),
+      ]);
+      const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
       const asset = createUploadedAssetRecord(assetId, file, {
         kind: 'audio',
         mimeType: file.type || 'audio/mpeg',
@@ -598,11 +688,12 @@ export default function Editor() {
         sourceDuration: safeDuration,
         trimStart: 0,
         waveform,
-        bpm: bpm ?? null,
+        bpm: analysisBundle.bpm ?? null,
       };
 
       stopPlayback();
       setProject((currentProject) => replaceMusicClip(currentProject, clip, asset));
+      setMusicAnalysis(analysisBundle.analysisResult ? { assetId, result: analysisBundle.analysisResult } : null);
       setAssetBlobs((currentBlobs) => {
         const nextBlobs = {
           ...currentBlobs,
@@ -620,7 +711,7 @@ export default function Editor() {
     } finally {
       URL.revokeObjectURL(temporaryUrl);
     }
-  }, [stopPlayback]);
+  }, [analyzeMusicSource, stopPlayback]);
 
   const handleUploadBackgroundMedia = useCallback(async (file: File) => {
     const isVideo = file.type.startsWith('video/');
@@ -806,10 +897,10 @@ export default function Editor() {
       const url = URL.createObjectURL(blob);
 
       try {
-        const [duration, waveform, bpm] = await Promise.all([
+        const [duration, waveform, analysisBundle] = await Promise.all([
           getAudioDuration(url),
           extractWaveformPeaks(url),
-          estimateBpmFromAudioUrl(url),
+          analyzeMusicSource(blob, url),
         ]);
         const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
         const previousMusicAssetId = currentProject.music.clip?.assetId ?? null;
@@ -824,11 +915,12 @@ export default function Editor() {
           sourceDuration: asset.duration ?? safeDuration,
           trimStart: 0,
           waveform,
-          bpm: bpm ?? null,
+          bpm: analysisBundle.bpm ?? null,
         };
 
         stopPlayback();
         setProject((nextProject) => replaceMusicClip(nextProject, clip, asset));
+        setMusicAnalysis(analysisBundle.analysisResult ? { assetId, result: analysisBundle.analysisResult } : null);
         setAssetBlobs((currentBlobs) => {
           const next = { ...currentBlobs };
           if (previousMusicAssetId && previousMusicAssetId !== assetId) {
@@ -879,7 +971,7 @@ export default function Editor() {
       setProject((nextProject) => upsertBackgroundSegment(nextProject, segment, asset, { replacePlaceholder: hasSinglePlaceholder }));
       setSelectedClipId(segmentId);
     }
-  }, [stopPlayback]);
+  }, [analyzeMusicSource, stopPlayback]);
 
   const handleUpdateClip = useCallback((id: string, updates: Partial<Clip>) => {
     setProject((currentProject) => updateTimelineClipInProject(currentProject, id, updates));
@@ -1268,6 +1360,11 @@ export default function Editor() {
         renderState={renderState}
         renderProgress={renderProgress}
         renderMessage={renderMessage}
+        splitPartRangePreset={project.splitPlanning.preset}
+        onSplitPartRangePresetChange={handleSplitPresetChange}
+        onGenerateSplitMarkers={handleGenerateSplitMarkers}
+        splitMarkerGenerationDisabled={!musicClip?.assetUrl || isGeneratingSplitMarkers}
+        isGeneratingSplitMarkers={isGeneratingSplitMarkers}
         onSave={handleSave}
         onNewProject={handleNewProject}
         onExport={handleExport}
@@ -1356,6 +1453,7 @@ export default function Editor() {
                 beatBpm={musicClip?.bpm ?? null}
                 beatGridStartSec={musicClip?.start ?? 0}
                 subtitleSnapTimes={subtitleSnapTimes}
+                splitMarkerTimes={splitMarkerTimes}
                 onDropMediaFromGallery={handleDropMediaOnTimeline}
               />
             </ResizablePanel>

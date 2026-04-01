@@ -78,6 +78,7 @@ class AudioAnalysisResponse(BaseModel):
     bpm: float
     beatGrid: list[float]
     onsetStrength: list[AudioAnalysisPointResponse]
+    energyStrength: list[AudioAnalysisPointResponse]
     sectionBoundaries: list[float]
     sections: list[AudioAnalysisSectionResponse]
 

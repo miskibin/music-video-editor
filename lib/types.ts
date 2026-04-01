@@ -10,6 +10,8 @@ export type AlignmentLanguage = 'en' | 'pl';
 
 export type SubtitleAlignmentStatus = 'idle' | 'running' | 'review' | 'applied' | 'error';
 
+export type SplitPartRangePreset = '4-7' | '6-10' | '9-15' | '15-25';
+
 /** Visual preset id for subtitle appearance (sidebar + Remotion). */
 export type SubtitleStylePreset =
   | 'glass'
@@ -195,6 +197,18 @@ export interface SubtitleAlignmentState {
   errorMessage: string | null;
 }
 
+export interface TimelineSplitMarker {
+  time: number;
+  score: number;
+  reasons: string[];
+}
+
+export interface SplitPlanningState {
+  preset: SplitPartRangePreset;
+  markers: TimelineSplitMarker[];
+  generatedAt: string | null;
+}
+
 export interface LyricSyncState {
   subtitleAlignment: SubtitleAlignmentState;
 }
@@ -251,6 +265,7 @@ export interface EditorProject {
   background: BackgroundLayer;
   assets: Record<string, AssetRecord>;
   lyricSync: LyricSyncState;
+  splitPlanning: SplitPlanningState;
   mediaLibraryAssetIds: string[];
 }
 

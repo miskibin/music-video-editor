@@ -36,6 +36,8 @@ interface Props {
   beatGridStartSec?: number;
   /** Subtitle cue start times (seconds) for snapping. */
   subtitleSnapTimes?: readonly number[];
+  /** Generated split markers for suggested background changes. */
+  splitMarkerTimes?: readonly number[];
   /** Drop media from the gallery onto a track at a timeline time. */
   onDropMediaFromGallery?: (payload: { trackId: string; timeSec: number; assetId: string }) => void;
 }
@@ -61,6 +63,7 @@ export default function Timeline({
   beatBpm = null,
   beatGridStartSec = 0,
   subtitleSnapTimes = [],
+  splitMarkerTimes = [],
   onDropMediaFromGallery,
 }: Props) {
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -129,13 +132,14 @@ export default function Timeline({
     const merged: number[] = [0];
     merged.push(...beatTimes);
     merged.push(...subtitleSnapTimes);
+    merged.push(...splitMarkerTimes);
     for (const c of clips) {
       merged.push(c.start, c.start + c.duration);
     }
     return [...new Set(merged.map((t) => Math.round(t * 1000) / 1000))]
       .filter((t) => t >= 0 && t <= timelineDuration)
       .sort((a, b) => a - b);
-  }, [beatTimes, clips, subtitleSnapTimes, timelineDuration]);
+  }, [beatTimes, clips, splitMarkerTimes, subtitleSnapTimes, timelineDuration]);
 
   const trackRowHeight = useMemo(() => {
     if (tracks.length === 0) {
@@ -377,6 +381,18 @@ export default function Timeline({
                 style={{ left: `${t * pixelsPerSecond}px` }}
               />
             ))}
+            {splitMarkerTimes.map((t, index) => (
+              <div
+                key={`split-ruler-${t}`}
+                className="absolute top-0 bottom-0 pointer-events-none z-[10]"
+                style={{ left: `${t * pixelsPerSecond}px` }}
+              >
+                <div className="absolute inset-y-0 left-0 w-px bg-sky-300/90" />
+                <span className="absolute top-0 left-1 rounded bg-sky-300/12 px-1 py-0.5 text-[9px] font-mono text-sky-200">
+                  S{index + 1}
+                </span>
+              </div>
+            ))}
           </div>
 
           <div className="absolute top-0 bottom-0 w-px bg-red-500 z-30 pointer-events-none" style={playheadStyle}>
@@ -404,6 +420,26 @@ export default function Timeline({
                   className="absolute top-0 bottom-0 w-px bg-amber-500/25"
                   style={{ left: `${t * pixelsPerSecond}px` }}
                 />
+              ))}
+            </div>
+          ) : null}
+          {splitMarkerTimes.length > 0 ? (
+            <div
+              className="pointer-events-none absolute left-40 top-0 bottom-0 z-[9]"
+              style={{ width: `${timelineWidth}px` }}
+            >
+              {splitMarkerTimes.map((t, index) => (
+                <div
+                  key={`split-track-${t}`}
+                  className="absolute top-0 bottom-0"
+                  style={{ left: `${t * pixelsPerSecond}px` }}
+                >
+                  <div className="absolute inset-y-0 left-0 w-px bg-sky-300/80" />
+                  <div className="absolute inset-y-0 left-0 w-5 -translate-x-1/2 bg-gradient-to-r from-sky-300/10 to-transparent" />
+                  <span className="absolute top-2 left-2 rounded bg-zinc-950/85 px-1.5 py-0.5 text-[10px] font-mono text-sky-200">
+                    S{index + 1}
+                  </span>
+                </div>
               ))}
             </div>
           ) : null}

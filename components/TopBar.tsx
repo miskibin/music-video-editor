@@ -1,8 +1,8 @@
 import React from 'react';
-import { Download, FilePlus, Save, Settings, Subtitles, Undo, Redo } from 'lucide-react';
+import { Download, FilePlus, Save, Scissors, Settings, Subtitles, Undo, Redo } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { SubtitleAlignmentStatus } from '@/lib/types';
+import { SplitPartRangePreset, SubtitleAlignmentStatus } from '@/lib/types';
 
 type SaveState = 'loading' | 'saving' | 'saved' | 'error';
 
@@ -13,6 +13,11 @@ interface Props {
   renderState: 'idle' | 'rendering' | 'success' | 'error';
   renderProgress: number;
   renderMessage: string | null;
+  splitPartRangePreset: SplitPartRangePreset;
+  onSplitPartRangePresetChange: (preset: SplitPartRangePreset) => void;
+  onGenerateSplitMarkers: () => void;
+  splitMarkerGenerationDisabled: boolean;
+  isGeneratingSplitMarkers: boolean;
   onSave: () => void;
   onNewProject: () => void;
   onExport: () => void;
@@ -29,6 +34,11 @@ function TopBar({
   renderState,
   renderProgress,
   renderMessage,
+  splitPartRangePreset,
+  onSplitPartRangePresetChange,
+  onGenerateSplitMarkers,
+  splitMarkerGenerationDisabled,
+  isGeneratingSplitMarkers,
   onSave,
   onNewProject,
   onExport,
@@ -54,6 +64,7 @@ function TopBar({
   const exportTone = renderState === 'error' ? 'text-rose-300' : 'text-zinc-400';
   const progressPercent = Math.max(0, Math.min(100, Math.round(renderProgress * 100)));
   const exportLabel = renderState === 'rendering' ? `Rendering ${progressPercent}%` : 'Export MP4';
+  const splitButtonLabel = isGeneratingSplitMarkers ? 'Planning Splits' : 'Create Split Markers';
 
   return (
     <header className="relative h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 shrink-0">
@@ -99,6 +110,29 @@ function TopBar({
             {renderState === 'rendering' ? `${progressPercent}% - ${renderMessage}` : renderMessage}
           </span>
         ) : null}
+        <label className="hidden items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-400 md:flex">
+          <span>Parts</span>
+          <select
+            value={splitPartRangePreset}
+            onChange={(event) => onSplitPartRangePresetChange(event.target.value as SplitPartRangePreset)}
+            className="border-0 bg-transparent font-mono text-zinc-200 outline-none"
+          >
+            <option value="4-7">4-7</option>
+            <option value="6-10">6-10</option>
+            <option value="9-15">9-15</option>
+            <option value="15-25">15-25</option>
+          </select>
+        </label>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onGenerateSplitMarkers}
+          disabled={splitMarkerGenerationDisabled}
+          className="text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:opacity-60"
+        >
+          <Scissors className="w-4 h-4 mr-2" />
+          {splitButtonLabel}
+        </Button>
         <Button
           variant="ghost"
           size="sm"

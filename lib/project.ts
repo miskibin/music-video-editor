@@ -9,12 +9,15 @@ import {
   LyricSyncState,
   MotionConfig,
   MusicClip,
+  SplitPartRangePreset,
+  SplitPlanningState,
   SubtitleAlignmentInput,
   SubtitleAlignmentResult,
   SubtitleAlignmentState,
   SubtitleCue,
   DEFAULT_SUBTITLE_STYLE,
   SubtitleStyle,
+  TimelineSplitMarker,
   Track,
   TransitionConfig,
 } from './types';
@@ -171,6 +174,20 @@ const subtitleAlignmentStateSchema = z.object({
   errorMessage: z.string().nullable(),
 });
 
+const splitPartRangeSchema = z.enum(['4-7', '6-10', '9-15', '15-25']);
+
+const timelineSplitMarkerSchema = z.object({
+  time: z.number().min(0),
+  score: z.number().min(0),
+  reasons: z.array(z.string()),
+});
+
+const splitPlanningStateSchema = z.object({
+  preset: splitPartRangeSchema.default('6-10'),
+  markers: z.array(timelineSplitMarkerSchema).default([]),
+  generatedAt: z.string().nullable().default(null),
+});
+
 const lyricSyncStateSchema = z.object({
   subtitleAlignment: subtitleAlignmentStateSchema,
 });
@@ -221,6 +238,7 @@ const editorProjectSchema = z.object({
   subtitles: subtitleLayerSchema,
   background: backgroundLayerSchema,
   assets: z.record(z.string(), assetRecordSchema),
+  splitPlanning: splitPlanningStateSchema,
   mediaLibraryAssetIds: z.array(z.string()).default([]),
   lyricSync: lyricSyncStateSchema,
 });
@@ -246,6 +264,7 @@ const legacyPhase3ProjectSchema = z.object({
     segments: z.array(backgroundSegmentSchema),
   }),
   assets: z.record(z.string(), assetRecordSchema),
+  splitPlanning: splitPlanningStateSchema.optional(),
   mediaLibraryAssetIds: z.array(z.string()).optional(),
   phase3: lyricSyncStateSchema,
 });
@@ -268,6 +287,7 @@ const legacyEditorProjectSchema = z.object({
   subtitles: subtitleLayerSchema,
   background: backgroundLayerSchema,
   assets: z.record(z.string(), assetRecordSchema),
+  splitPlanning: splitPlanningStateSchema.optional(),
 });
 
 const nowIso = () => new Date().toISOString();
@@ -320,10 +340,19 @@ const createDefaultLyricSyncState = (project: {
   subtitleAlignment: createDefaultSubtitleAlignmentState(createDefaultSubtitleAlignmentInput(project)),
 });
 
+const createDefaultSplitPlanningState = (
+  preset: SplitPartRangePreset = '6-10',
+): SplitPlanningState => ({
+  preset,
+  markers: [],
+  generatedAt: null,
+});
+
 const migrateLegacyProject = (legacyProject: z.infer<typeof legacyEditorProjectSchema>): EditorProject => ({
   ...legacyProject,
   version: PROJECT_VERSION,
   lyricSync: createDefaultLyricSyncState(legacyProject),
+  splitPlanning: legacyProject.splitPlanning ?? createDefaultSplitPlanningState(),
   mediaLibraryAssetIds: [],
 }) as EditorProject;
 
@@ -337,6 +366,7 @@ const migrateLegacyPhase3Project = (legacyProject: z.infer<typeof legacyPhase3Pr
       subtitleStyle: project.subtitles.subtitleStyle ?? createDefaultSubtitleStyle(),
     },
     lyricSync: phase3,
+    splitPlanning: legacyProject.splitPlanning ?? createDefaultSplitPlanningState(),
     mediaLibraryAssetIds: legacyProject.mediaLibraryAssetIds ?? [],
   } as EditorProject;
 };
@@ -424,6 +454,18 @@ export const normalizeEditorProject = (project: EditorProject): EditorProject =>
       ...project.music,
       clip: project.music.clip ? normalizeMusicClip(project.music.clip) : null,
     },
+    splitPlanning: {
+      preset: project.splitPlanning?.preset ?? '6-10',
+      generatedAt: project.splitPlanning?.generatedAt ?? null,
+      markers: [...(project.splitPlanning?.markers ?? [])]
+        .filter((marker) => Number.isFinite(marker.time) && marker.time >= 0)
+        .map((marker) => ({
+          time: Math.round(marker.time * 1000) / 1000,
+          score: Math.max(0, marker.score),
+          reasons: marker.reasons,
+        }))
+        .sort((left, right) => left.time - right.time),
+    },
   };
 };
 
@@ -481,6 +523,7 @@ export const createDefaultProject = (): EditorProject => {
       globalMotion: createDefaultMotionConfig(),
     },
     assets: {},
+    splitPlanning: createDefaultSplitPlanningState(),
     mediaLibraryAssetIds: [],
   };
 
@@ -837,6 +880,52 @@ export const updateSubtitleAlignmentInput = (
   },
 });
 
+export const storeSplitMarkers = (
+  project: EditorProject,
+  preset: SplitPartRangePreset,
+  markers: TimelineSplitMarker[],
+): EditorProject => markProjectUpdated({
+  ...project,
+  splitPlanning: {
+    preset,
+    generatedAt: nowIso(),
+    markers: [...markers]
+      .filter((marker) => Number.isFinite(marker.time) && marker.time >= 0)
+      .map((marker) => ({
+        time: Math.round(marker.time * 1000) / 1000,
+        score: Math.max(0, marker.score),
+        reasons: [...marker.reasons],
+      }))
+      .sort((left, right) => left.time - right.time),
+  },
+});
+
+export const setSplitPlanningPreset = (
+  project: EditorProject,
+  preset: SplitPartRangePreset,
+): EditorProject => {
+  if (project.splitPlanning.preset === preset) {
+    return project;
+  }
+
+  return markProjectUpdated({
+    ...project,
+    splitPlanning: {
+      ...project.splitPlanning,
+      preset,
+    },
+  });
+};
+
+export const clearSplitMarkers = (project: EditorProject): EditorProject => markProjectUpdated({
+  ...project,
+  splitPlanning: {
+    preset: project.splitPlanning.preset,
+    generatedAt: null,
+    markers: [],
+  },
+});
+
 export const startSubtitleAlignment = (
   project: EditorProject,
   input: SubtitleAlignmentInput,
@@ -933,6 +1022,11 @@ export const replaceMusicClip = (
   assets: {
     ...project.assets,
     [asset.id]: asset,
+  },
+  splitPlanning: {
+    preset: project.splitPlanning.preset,
+    generatedAt: null,
+    markers: [],
   },
 }));
 
@@ -1118,6 +1212,11 @@ export const deleteTimelineClipFromProject = (
       music: {
         ...project.music,
         clip: null,
+      },
+      splitPlanning: {
+        preset: project.splitPlanning.preset,
+        generatedAt: null,
+        markers: [],
       },
     }));
   }
