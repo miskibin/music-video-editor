@@ -620,16 +620,12 @@ function MediaGalleryPanel({
           <DialogHeader>
             <DialogTitle className="text-zinc-100">API keys and LLM settings</DialogTitle>
             <DialogDescription className="text-zinc-500">
-              These values are stored only in this browser. Stock provider keys are optional. The LLM test uses the
-              OpenAI-compatible LangChain adapter with your model, API key, and optional base URL.
+              These values are stored only in this browser. 
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-zinc-100">Stock media</p>
-                <p className="text-[11px] text-zinc-500">Optional keys for Pexels and Pixabay search.</p>
-              </div>
+
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -710,10 +706,7 @@ function MediaGalleryPanel({
             </div>
             <Separator className="bg-zinc-800" />
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-zinc-100">LLM</p>
-                <p className="text-[11px] text-zinc-500">OpenAI-compatible provider via LangChain.</p>
-              </div>
+
               {(savedLlmSettings.baseUrl || savedLlmSettings.apiKey || savedLlmSettings.model) ? (
                 <Button
                   type="button"
