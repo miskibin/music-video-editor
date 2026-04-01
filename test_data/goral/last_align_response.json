@@ -1,0 +1,1315 @@
+{
+  "provider": "whisperx",
+  "generatedAt": "2026-04-01T13:55:01.130059+00:00",
+  "warnings": [],
+  "lowConfidenceWordIds": [
+    "4bd3fa1949",
+    "98a96914d1",
+    "2b2ce8e5bb",
+    "1643959a75",
+    "9e6a13caf1",
+    "b23b8c5e84"
+  ],
+  "cues": [
+    {
+      "id": "8686b38f8b",
+      "start": 26.626,
+      "duration": 23.982,
+      "text": "Z tym rano ze swego szawa słuchu mnie gniecie od picia i kwasu Idę posłusznie do wiec na chale a w głowie ino mam twarde drągalę doje i doje te kudłate owce a wolałbym chętnie zabawić się słopcem nagle mnie baran rogami fest płuka taka to ciężka gejowska jest sztuka",
+      "words": [
+        {
+          "id": "4bd3fa1949",
+          "text": "Z",
+          "startMs": 26626,
+          "endMs": 26646,
+          "confidence": 0.03
+        },
+        {
+          "id": "d15ae89ade",
+          "text": "tym",
+          "startMs": 26666,
+          "endMs": 26826,
+          "confidence": 0.76
+        },
+        {
+          "id": "52624e4683",
+          "text": "rano",
+          "startMs": 26866,
+          "endMs": 27347,
+          "confidence": 0.93
+        },
+        {
+          "id": "21870376af",
+          "text": "ze",
+          "startMs": 27387,
+          "endMs": 27487,
+          "confidence": 1.0
+        },
+        {
+          "id": "5aac981233",
+          "text": "swego",
+          "startMs": 27567,
+          "endMs": 28067,
+          "confidence": 0.98
+        },
+        {
+          "id": "ff50a4a7dd",
+          "text": "szawa",
+          "startMs": 28187,
+          "endMs": 29068,
+          "confidence": 0.86
+        },
+        {
+          "id": "ac4ef73ca8",
+          "text": "słuchu",
+          "startMs": 29088,
+          "endMs": 29609,
+          "confidence": 0.65
+        },
+        {
+          "id": "25cb03dacf",
+          "text": "mnie",
+          "startMs": 29649,
+          "endMs": 29849,
+          "confidence": 0.93
+        },
+        {
+          "id": "5a89719406",
+          "text": "gniecie",
+          "startMs": 29889,
+          "endMs": 30470,
+          "confidence": 0.91
+        },
+        {
+          "id": "47eb368148",
+          "text": "od",
+          "startMs": 30530,
+          "endMs": 30670,
+          "confidence": 1.0
+        },
+        {
+          "id": "6f9a67561d",
+          "text": "picia",
+          "startMs": 30750,
+          "endMs": 31270,
+          "confidence": 0.84
+        },
+        {
+          "id": "abad51eb8a",
+          "text": "i",
+          "startMs": 31310,
+          "endMs": 31370,
+          "confidence": 0.96
+        },
+        {
+          "id": "57341e8661",
+          "text": "kwasu",
+          "startMs": 31410,
+          "endMs": 32191,
+          "confidence": 0.88
+        },
+        {
+          "id": "d333bf487a",
+          "text": "Idę",
+          "startMs": 32351,
+          "endMs": 32772,
+          "confidence": 0.87
+        },
+        {
+          "id": "b98c30ed6c",
+          "text": "posłusznie",
+          "startMs": 32852,
+          "endMs": 33613,
+          "confidence": 0.95
+        },
+        {
+          "id": "9b4371e6c9",
+          "text": "do",
+          "startMs": 33653,
+          "endMs": 34013,
+          "confidence": 0.98
+        },
+        {
+          "id": "dfb51d4180",
+          "text": "wiec",
+          "startMs": 34073,
+          "endMs": 34313,
+          "confidence": 0.79
+        },
+        {
+          "id": "92ccc2e5a9",
+          "text": "na",
+          "startMs": 34393,
+          "endMs": 34533,
+          "confidence": 0.98
+        },
+        {
+          "id": "3c995e4a09",
+          "text": "chale",
+          "startMs": 34573,
+          "endMs": 35354,
+          "confidence": 0.87
+        },
+        {
+          "id": "65b4cd45f5",
+          "text": "a",
+          "startMs": 35474,
+          "endMs": 35574,
+          "confidence": 0.87
+        },
+        {
+          "id": "502bb95ab2",
+          "text": "w",
+          "startMs": 35614,
+          "endMs": 35674,
+          "confidence": 0.7
+        },
+        {
+          "id": "9c0764ede1",
+          "text": "głowie",
+          "startMs": 35714,
+          "endMs": 36155,
+          "confidence": 0.91
+        },
+        {
+          "id": "9262c41ea8",
+          "text": "ino",
+          "startMs": 36235,
+          "endMs": 36555,
+          "confidence": 0.9
+        },
+        {
+          "id": "3d4172f84f",
+          "text": "mam",
+          "startMs": 36595,
+          "endMs": 36816,
+          "confidence": 0.92
+        },
+        {
+          "id": "3c6ebb20bf",
+          "text": "twarde",
+          "startMs": 36876,
+          "endMs": 37396,
+          "confidence": 0.97
+        },
+        {
+          "id": "ee1b74fca5",
+          "text": "drągalę",
+          "startMs": 37436,
+          "endMs": 38417,
+          "confidence": 0.97
+        },
+        {
+          "id": "19f62f4ade",
+          "text": "doje",
+          "startMs": 38517,
+          "endMs": 39058,
+          "confidence": 0.99
+        },
+        {
+          "id": "5002c3e746",
+          "text": "i",
+          "startMs": 39078,
+          "endMs": 39238,
+          "confidence": 0.8
+        },
+        {
+          "id": "f04ded520a",
+          "text": "doje",
+          "startMs": 39278,
+          "endMs": 39758,
+          "confidence": 0.95
+        },
+        {
+          "id": "45e4d497cf",
+          "text": "te",
+          "startMs": 39838,
+          "endMs": 39978,
+          "confidence": 0.96
+        },
+        {
+          "id": "0e0c5669ac",
+          "text": "kudłate",
+          "startMs": 40039,
+          "endMs": 40819,
+          "confidence": 0.92
+        },
+        {
+          "id": "7b59d52123",
+          "text": "owce",
+          "startMs": 40939,
+          "endMs": 41360,
+          "confidence": 0.95
+        },
+        {
+          "id": "73897cae50",
+          "text": "a",
+          "startMs": 41460,
+          "endMs": 41540,
+          "confidence": 0.74
+        },
+        {
+          "id": "2e0b06a9b2",
+          "text": "wolałbym",
+          "startMs": 41580,
+          "endMs": 42201,
+          "confidence": 0.9
+        },
+        {
+          "id": "69ab578548",
+          "text": "chętnie",
+          "startMs": 42341,
+          "endMs": 42881,
+          "confidence": 0.7
+        },
+        {
+          "id": "595c6d26c7",
+          "text": "zabawić",
+          "startMs": 42921,
+          "endMs": 43522,
+          "confidence": 0.8
+        },
+        {
+          "id": "6240bdc3de",
+          "text": "się",
+          "startMs": 43622,
+          "endMs": 43782,
+          "confidence": 0.7
+        },
+        {
+          "id": "69267fc332",
+          "text": "słopcem",
+          "startMs": 43842,
+          "endMs": 44643,
+          "confidence": 0.89
+        },
+        {
+          "id": "8c85e42d7a",
+          "text": "nagle",
+          "startMs": 44683,
+          "endMs": 45143,
+          "confidence": 0.81
+        },
+        {
+          "id": "0c625d01da",
+          "text": "mnie",
+          "startMs": 45203,
+          "endMs": 45404,
+          "confidence": 0.88
+        },
+        {
+          "id": "c8ff6a2daa",
+          "text": "baran",
+          "startMs": 45464,
+          "endMs": 46004,
+          "confidence": 0.84
+        },
+        {
+          "id": "ffd26d1f87",
+          "text": "rogami",
+          "startMs": 46044,
+          "endMs": 46645,
+          "confidence": 0.87
+        },
+        {
+          "id": "6e9fb4f905",
+          "text": "fest",
+          "startMs": 46745,
+          "endMs": 46965,
+          "confidence": 0.9
+        },
+        {
+          "id": "2f3176cd9b",
+          "text": "płuka",
+          "startMs": 47025,
+          "endMs": 47525,
+          "confidence": 0.85
+        },
+        {
+          "id": "a0298f04a5",
+          "text": "taka",
+          "startMs": 47786,
+          "endMs": 48266,
+          "confidence": 0.89
+        },
+        {
+          "id": "266f144c66",
+          "text": "to",
+          "startMs": 48326,
+          "endMs": 48426,
+          "confidence": 0.81
+        },
+        {
+          "id": "bd933d6a0d",
+          "text": "ciężka",
+          "startMs": 48526,
+          "endMs": 49087,
+          "confidence": 0.85
+        },
+        {
+          "id": "5215a59e28",
+          "text": "gejowska",
+          "startMs": 49147,
+          "endMs": 49868,
+          "confidence": 0.89
+        },
+        {
+          "id": "98a96914d1",
+          "text": "jest",
+          "startMs": 49888,
+          "endMs": 50008,
+          "confidence": 0.36
+        },
+        {
+          "id": "8a6cdb5b6f",
+          "text": "sztuka",
+          "startMs": 50048,
+          "endMs": 50608,
+          "confidence": 0.77
+        }
+      ]
+    },
+    {
+      "id": "2e1fa67bf7",
+      "start": 55.994,
+      "duration": 17.792,
+      "text": "Z grubej ciupagi po pysku milej Nie chcę mi obabi nie chcę mi ożony Joje na chłopafę zna palony Tańcują kierpce skaczą łoscypki My na podchalu brzydzimy siecipki",
+      "words": [
+        {
+          "id": "271183a418",
+          "text": "Z",
+          "startMs": 55994,
+          "endMs": 56975,
+          "confidence": 0.78
+        },
+        {
+          "id": "05b421c329",
+          "text": "grubej",
+          "startMs": 57035,
+          "endMs": 59056,
+          "confidence": 0.91
+        },
+        {
+          "id": "981d3de1a2",
+          "text": "ciupagi",
+          "startMs": 59156,
+          "endMs": 59917,
+          "confidence": 0.85
+        },
+        {
+          "id": "c058ee1c69",
+          "text": "po",
+          "startMs": 59977,
+          "endMs": 60097,
+          "confidence": 0.97
+        },
+        {
+          "id": "278fe7bbdc",
+          "text": "pysku",
+          "startMs": 60177,
+          "endMs": 60717,
+          "confidence": 0.82
+        },
+        {
+          "id": "5d3800ad69",
+          "text": "milej",
+          "startMs": 60757,
+          "endMs": 61478,
+          "confidence": 0.83
+        },
+        {
+          "id": "de716e08c1",
+          "text": "Nie",
+          "startMs": 61558,
+          "endMs": 61758,
+          "confidence": 0.71
+        },
+        {
+          "id": "2bc0638e0e",
+          "text": "chcę",
+          "startMs": 61778,
+          "endMs": 62158,
+          "confidence": 0.89
+        },
+        {
+          "id": "4b33dca8b1",
+          "text": "mi",
+          "startMs": 62218,
+          "endMs": 62298,
+          "confidence": 0.85
+        },
+        {
+          "id": "0be9fcfee6",
+          "text": "obabi",
+          "startMs": 62378,
+          "endMs": 63019,
+          "confidence": 0.78
+        },
+        {
+          "id": "8e2fbc843e",
+          "text": "nie",
+          "startMs": 63059,
+          "endMs": 63279,
+          "confidence": 0.88
+        },
+        {
+          "id": "7ad6aa4c3a",
+          "text": "chcę",
+          "startMs": 63299,
+          "endMs": 63679,
+          "confidence": 0.78
+        },
+        {
+          "id": "7f7d9286d4",
+          "text": "mi",
+          "startMs": 63739,
+          "endMs": 63799,
+          "confidence": 0.84
+        },
+        {
+          "id": "d944b553df",
+          "text": "ożony",
+          "startMs": 63859,
+          "endMs": 64720,
+          "confidence": 0.88
+        },
+        {
+          "id": "ea84f9883a",
+          "text": "Joje",
+          "startMs": 64780,
+          "endMs": 65320,
+          "confidence": 0.84
+        },
+        {
+          "id": "9312d9c3df",
+          "text": "na",
+          "startMs": 65360,
+          "endMs": 65480,
+          "confidence": 0.92
+        },
+        {
+          "id": "d3fc150e73",
+          "text": "chłopafę",
+          "startMs": 65500,
+          "endMs": 66381,
+          "confidence": 0.78
+        },
+        {
+          "id": "ac6e651eea",
+          "text": "zna",
+          "startMs": 66441,
+          "endMs": 66781,
+          "confidence": 0.93
+        },
+        {
+          "id": "0b9dab1857",
+          "text": "palony",
+          "startMs": 66921,
+          "endMs": 67802,
+          "confidence": 0.75
+        },
+        {
+          "id": "d880e03003",
+          "text": "Tańcują",
+          "startMs": 67902,
+          "endMs": 68582,
+          "confidence": 0.86
+        },
+        {
+          "id": "49c7fd34d3",
+          "text": "kierpce",
+          "startMs": 68662,
+          "endMs": 69163,
+          "confidence": 0.9
+        },
+        {
+          "id": "0ebfb8b7ce",
+          "text": "skaczą",
+          "startMs": 69203,
+          "endMs": 69863,
+          "confidence": 0.76
+        },
+        {
+          "id": "2143f7cc34",
+          "text": "łoscypki",
+          "startMs": 69943,
+          "endMs": 70924,
+          "confidence": 0.83
+        },
+        {
+          "id": "e540671156",
+          "text": "My",
+          "startMs": 71004,
+          "endMs": 71164,
+          "confidence": 0.84
+        },
+        {
+          "id": "25f3d1db5e",
+          "text": "na",
+          "startMs": 71224,
+          "endMs": 71424,
+          "confidence": 0.95
+        },
+        {
+          "id": "9524c6906d",
+          "text": "podchalu",
+          "startMs": 71544,
+          "endMs": 72225,
+          "confidence": 0.76
+        },
+        {
+          "id": "b2c6fac9d7",
+          "text": "brzydzimy",
+          "startMs": 72285,
+          "endMs": 72985,
+          "confidence": 0.67
+        },
+        {
+          "id": "1860a43c31",
+          "text": "siecipki",
+          "startMs": 73045,
+          "endMs": 73786,
+          "confidence": 0.73
+        }
+      ]
+    },
+    {
+      "id": "57d5cebc04",
+      "start": 80.278,
+      "duration": 24.456,
+      "text": "Jedzym mi płacem na starym pnioku nagle juhasa jo widzym w pół roku idzie chłop wielki chłopina waleczny Uśmiech moc boczą na krok niestateczny łapie mnie mocno Zamoje szelki mówi że w gacjach mosprzęt dosyć wielki zarozuciłech gorzuch na kszoki i w sianie rybią się rzeźkie chłopoki",
+      "words": [
+        {
+          "id": "e6b614de07",
+          "text": "Jedzym",
+          "startMs": 80278,
+          "endMs": 80778,
+          "confidence": 0.77
+        },
+        {
+          "id": "ea3a7fa4f5",
+          "text": "mi",
+          "startMs": 80818,
+          "endMs": 80938,
+          "confidence": 0.82
+        },
+        {
+          "id": "cc0be7c407",
+          "text": "płacem",
+          "startMs": 81018,
+          "endMs": 81599,
+          "confidence": 0.97
+        },
+        {
+          "id": "0c72e4c4d7",
+          "text": "na",
+          "startMs": 81659,
+          "endMs": 81859,
+          "confidence": 0.93
+        },
+        {
+          "id": "27ee92ed26",
+          "text": "starym",
+          "startMs": 81939,
+          "endMs": 82479,
+          "confidence": 0.88
+        },
+        {
+          "id": "c273604100",
+          "text": "pnioku",
+          "startMs": 82559,
+          "endMs": 83280,
+          "confidence": 0.89
+        },
+        {
+          "id": "7daa0d102b",
+          "text": "nagle",
+          "startMs": 83380,
+          "endMs": 83840,
+          "confidence": 0.99
+        },
+        {
+          "id": "223c3f12c7",
+          "text": "juhasa",
+          "startMs": 83900,
+          "endMs": 84641,
+          "confidence": 0.91
+        },
+        {
+          "id": "f9e8535502",
+          "text": "jo",
+          "startMs": 84681,
+          "endMs": 84881,
+          "confidence": 0.92
+        },
+        {
+          "id": "3e7d5b2307",
+          "text": "widzym",
+          "startMs": 84941,
+          "endMs": 85341,
+          "confidence": 0.88
+        },
+        {
+          "id": "e8f03c731e",
+          "text": "w",
+          "startMs": 85381,
+          "endMs": 85421,
+          "confidence": 0.77
+        },
+        {
+          "id": "c122e589e0",
+          "text": "pół",
+          "startMs": 85481,
+          "endMs": 85701,
+          "confidence": 0.91
+        },
+        {
+          "id": "4161f63483",
+          "text": "roku",
+          "startMs": 85742,
+          "endMs": 86422,
+          "confidence": 0.97
+        },
+        {
+          "id": "e73e35bdc5",
+          "text": "idzie",
+          "startMs": 86542,
+          "endMs": 86862,
+          "confidence": 0.77
+        },
+        {
+          "id": "e607259e72",
+          "text": "chłop",
+          "startMs": 86882,
+          "endMs": 87202,
+          "confidence": 0.62
+        },
+        {
+          "id": "5d34aac810",
+          "text": "wielki",
+          "startMs": 87262,
+          "endMs": 87743,
+          "confidence": 0.85
+        },
+        {
+          "id": "4aabb385d3",
+          "text": "chłopina",
+          "startMs": 87763,
+          "endMs": 88523,
+          "confidence": 0.91
+        },
+        {
+          "id": "e71f7a7bdc",
+          "text": "waleczny",
+          "startMs": 88603,
+          "endMs": 89544,
+          "confidence": 0.94
+        },
+        {
+          "id": "ef36e35fb2",
+          "text": "Uśmiech",
+          "startMs": 89644,
+          "endMs": 90084,
+          "confidence": 0.83
+        },
+        {
+          "id": "e8b01a0e3d",
+          "text": "moc",
+          "startMs": 90124,
+          "endMs": 90304,
+          "confidence": 0.66
+        },
+        {
+          "id": "81f6958ad7",
+          "text": "boczą",
+          "startMs": 90364,
+          "endMs": 90785,
+          "confidence": 0.84
+        },
+        {
+          "id": "6387b92f44",
+          "text": "na",
+          "startMs": 90845,
+          "endMs": 90965,
+          "confidence": 1.0
+        },
+        {
+          "id": "c442f3b464",
+          "text": "krok",
+          "startMs": 91045,
+          "endMs": 91345,
+          "confidence": 0.71
+        },
+        {
+          "id": "2a1a6f05b1",
+          "text": "niestateczny",
+          "startMs": 91385,
+          "endMs": 92586,
+          "confidence": 0.84
+        },
+        {
+          "id": "b1077e2e8e",
+          "text": "łapie",
+          "startMs": 92666,
+          "endMs": 93126,
+          "confidence": 0.92
+        },
+        {
+          "id": "079aa3c963",
+          "text": "mnie",
+          "startMs": 93166,
+          "endMs": 93406,
+          "confidence": 0.89
+        },
+        {
+          "id": "7190afb8be",
+          "text": "mocno",
+          "startMs": 93446,
+          "endMs": 94127,
+          "confidence": 0.98
+        },
+        {
+          "id": "f880901518",
+          "text": "Zamoje",
+          "startMs": 94207,
+          "endMs": 94887,
+          "confidence": 0.94
+        },
+        {
+          "id": "d72b8ad29f",
+          "text": "szelki",
+          "startMs": 94987,
+          "endMs": 95568,
+          "confidence": 0.86
+        },
+        {
+          "id": "f8b3dd9e82",
+          "text": "mówi",
+          "startMs": 95788,
+          "endMs": 96228,
+          "confidence": 0.88
+        },
+        {
+          "id": "ba0fc10765",
+          "text": "że",
+          "startMs": 96288,
+          "endMs": 96428,
+          "confidence": 0.91
+        },
+        {
+          "id": "2b2ce8e5bb",
+          "text": "w",
+          "startMs": 96448,
+          "endMs": 96468,
+          "confidence": 0.02
+        },
+        {
+          "id": "ed1142eb55",
+          "text": "gacjach",
+          "startMs": 96528,
+          "endMs": 97009,
+          "confidence": 0.73
+        },
+        {
+          "id": "4dd7608fe8",
+          "text": "mosprzęt",
+          "startMs": 97049,
+          "endMs": 97609,
+          "confidence": 0.89
+        },
+        {
+          "id": "d3c03e78e1",
+          "text": "dosyć",
+          "startMs": 97689,
+          "endMs": 98049,
+          "confidence": 0.91
+        },
+        {
+          "id": "0268e8e842",
+          "text": "wielki",
+          "startMs": 98089,
+          "endMs": 98750,
+          "confidence": 0.85
+        },
+        {
+          "id": "78d68619d1",
+          "text": "zarozuciłech",
+          "startMs": 98830,
+          "endMs": 100131,
+          "confidence": 0.93
+        },
+        {
+          "id": "e756062c77",
+          "text": "gorzuch",
+          "startMs": 100211,
+          "endMs": 100751,
+          "confidence": 0.75
+        },
+        {
+          "id": "aa8e28ee4a",
+          "text": "na",
+          "startMs": 100791,
+          "endMs": 100971,
+          "confidence": 1.0
+        },
+        {
+          "id": "940f236a91",
+          "text": "kszoki",
+          "startMs": 101031,
+          "endMs": 101772,
+          "confidence": 0.83
+        },
+        {
+          "id": "309516a8d7",
+          "text": "i",
+          "startMs": 102032,
+          "endMs": 102092,
+          "confidence": 0.98
+        },
+        {
+          "id": "0b9c5d3f8a",
+          "text": "w",
+          "startMs": 102132,
+          "endMs": 102172,
+          "confidence": 0.96
+        },
+        {
+          "id": "62d27a917a",
+          "text": "sianie",
+          "startMs": 102212,
+          "endMs": 102712,
+          "confidence": 0.77
+        },
+        {
+          "id": "c3527ccf0e",
+          "text": "rybią",
+          "startMs": 102772,
+          "endMs": 103193,
+          "confidence": 0.8
+        },
+        {
+          "id": "75da4e043c",
+          "text": "się",
+          "startMs": 103273,
+          "endMs": 103433,
+          "confidence": 0.67
+        },
+        {
+          "id": "a4c31a2f69",
+          "text": "rzeźkie",
+          "startMs": 103513,
+          "endMs": 104013,
+          "confidence": 0.73
+        },
+        {
+          "id": "2038fa1f73",
+          "text": "chłopoki",
+          "startMs": 104053,
+          "endMs": 104734,
+          "confidence": 0.96
+        }
+      ]
+    },
+    {
+      "id": "f8f828d43a",
+      "start": 123.714,
+      "duration": 29.06,
+      "text": "Wieselna wódka strumieniem się leje a tam w 100 dole kochają się geje ślebo damiłości te nasze tatry Niech nam wstuleje wiewają wiatry Kurolski gej kurolski gej z grubej ciupagi po pysku milej Nie chcę mi obaby nie chcę mi ożony Joje na chłoppa pesna palony",
+      "words": [
+        {
+          "id": "1c2bd90192",
+          "text": "Wieselna",
+          "startMs": 123714,
+          "endMs": 124374,
+          "confidence": 0.69
+        },
+        {
+          "id": "a11aca2e8e",
+          "text": "wódka",
+          "startMs": 124414,
+          "endMs": 124835,
+          "confidence": 0.94
+        },
+        {
+          "id": "9eba03dd35",
+          "text": "strumieniem",
+          "startMs": 124895,
+          "endMs": 125675,
+          "confidence": 0.84
+        },
+        {
+          "id": "0ff93cc150",
+          "text": "się",
+          "startMs": 125755,
+          "endMs": 125915,
+          "confidence": 0.78
+        },
+        {
+          "id": "04f1b23eb2",
+          "text": "leje",
+          "startMs": 125996,
+          "endMs": 126656,
+          "confidence": 0.93
+        },
+        {
+          "id": "9c3a8cfc0c",
+          "text": "a",
+          "startMs": 126756,
+          "endMs": 126876,
+          "confidence": 0.89
+        },
+        {
+          "id": "e7dc7e424e",
+          "text": "tam",
+          "startMs": 126956,
+          "endMs": 127196,
+          "confidence": 0.98
+        },
+        {
+          "id": "1643959a75",
+          "text": "w",
+          "startMs": 127216,
+          "endMs": 127236,
+          "confidence": 0.02
+        },
+        {
+          "id": "fd339ba614",
+          "text": "100",
+          "startMs": 127276,
+          "endMs": 127497,
+          "confidence": 0.99
+        },
+        {
+          "id": "4fe97c4c26",
+          "text": "dole",
+          "startMs": 127557,
+          "endMs": 127977,
+          "confidence": 0.96
+        },
+        {
+          "id": "64fb9eb9c1",
+          "text": "kochają",
+          "startMs": 128037,
+          "endMs": 128737,
+          "confidence": 0.86
+        },
+        {
+          "id": "ed3ee3fd20",
+          "text": "się",
+          "startMs": 128837,
+          "endMs": 129018,
+          "confidence": 0.82
+        },
+        {
+          "id": "22f0251cca",
+          "text": "geje",
+          "startMs": 129098,
+          "endMs": 129678,
+          "confidence": 0.88
+        },
+        {
+          "id": "e62a08abda",
+          "text": "ślebo",
+          "startMs": 129758,
+          "endMs": 130359,
+          "confidence": 0.92
+        },
+        {
+          "id": "864854085c",
+          "text": "damiłości",
+          "startMs": 130419,
+          "endMs": 131319,
+          "confidence": 0.91
+        },
+        {
+          "id": "ba5747739b",
+          "text": "te",
+          "startMs": 131399,
+          "endMs": 131619,
+          "confidence": 0.94
+        },
+        {
+          "id": "fbb6ef1f3a",
+          "text": "nasze",
+          "startMs": 131679,
+          "endMs": 132100,
+          "confidence": 0.87
+        },
+        {
+          "id": "e67c723164",
+          "text": "tatry",
+          "startMs": 132180,
+          "endMs": 132920,
+          "confidence": 0.69
+        },
+        {
+          "id": "7ce739cfdb",
+          "text": "Niech",
+          "startMs": 132960,
+          "endMs": 133200,
+          "confidence": 0.77
+        },
+        {
+          "id": "6856093506",
+          "text": "nam",
+          "startMs": 133240,
+          "endMs": 133421,
+          "confidence": 0.98
+        },
+        {
+          "id": "22466444e8",
+          "text": "wstuleje",
+          "startMs": 133441,
+          "endMs": 134221,
+          "confidence": 0.92
+        },
+        {
+          "id": "28f108a43d",
+          "text": "wiewają",
+          "startMs": 134261,
+          "endMs": 135202,
+          "confidence": 0.9
+        },
+        {
+          "id": "5101dbdff0",
+          "text": "wiatry",
+          "startMs": 135222,
+          "endMs": 140625,
+          "confidence": 0.73
+        },
+        {
+          "id": "a1e51bfd19",
+          "text": "Kurolski",
+          "startMs": 140686,
+          "endMs": 142086,
+          "confidence": 0.85
+        },
+        {
+          "id": "9e6a13caf1",
+          "text": "gej",
+          "startMs": 142106,
+          "endMs": 142167,
+          "confidence": 0.0
+        },
+        {
+          "id": "caf2cca559",
+          "text": "kurolski",
+          "startMs": 142227,
+          "endMs": 142947,
+          "confidence": 0.85
+        },
+        {
+          "id": "e465ee99e5",
+          "text": "gej",
+          "startMs": 143027,
+          "endMs": 143648,
+          "confidence": 0.88
+        },
+        {
+          "id": "3d567a834e",
+          "text": "z",
+          "startMs": 143688,
+          "endMs": 143748,
+          "confidence": 0.72
+        },
+        {
+          "id": "0b571150b9",
+          "text": "grubej",
+          "startMs": 143788,
+          "endMs": 144248,
+          "confidence": 0.9
+        },
+        {
+          "id": "05ff07dcc9",
+          "text": "ciupagi",
+          "startMs": 144328,
+          "endMs": 145068,
+          "confidence": 0.86
+        },
+        {
+          "id": "fd915c8973",
+          "text": "po",
+          "startMs": 145129,
+          "endMs": 145269,
+          "confidence": 1.0
+        },
+        {
+          "id": "f2c11ebf54",
+          "text": "pysku",
+          "startMs": 145349,
+          "endMs": 145869,
+          "confidence": 0.85
+        },
+        {
+          "id": "fa86f1eded",
+          "text": "milej",
+          "startMs": 145909,
+          "endMs": 146650,
+          "confidence": 0.91
+        },
+        {
+          "id": "c4911be615",
+          "text": "Nie",
+          "startMs": 146730,
+          "endMs": 146910,
+          "confidence": 0.81
+        },
+        {
+          "id": "d7fd83bf91",
+          "text": "chcę",
+          "startMs": 146930,
+          "endMs": 147290,
+          "confidence": 0.78
+        },
+        {
+          "id": "2d2bb54d2a",
+          "text": "mi",
+          "startMs": 147370,
+          "endMs": 147490,
+          "confidence": 0.85
+        },
+        {
+          "id": "dec1e171ac",
+          "text": "obaby",
+          "startMs": 147550,
+          "endMs": 148211,
+          "confidence": 0.84
+        },
+        {
+          "id": "30bfa09033",
+          "text": "nie",
+          "startMs": 148251,
+          "endMs": 148431,
+          "confidence": 0.8
+        },
+        {
+          "id": "f5968d2826",
+          "text": "chcę",
+          "startMs": 148491,
+          "endMs": 148831,
+          "confidence": 0.9
+        },
+        {
+          "id": "4463a0c4ef",
+          "text": "mi",
+          "startMs": 148891,
+          "endMs": 148991,
+          "confidence": 0.67
+        },
+        {
+          "id": "b50b4b9b30",
+          "text": "ożony",
+          "startMs": 149051,
+          "endMs": 149892,
+          "confidence": 0.92
+        },
+        {
+          "id": "d70d792f17",
+          "text": "Joje",
+          "startMs": 149972,
+          "endMs": 150492,
+          "confidence": 0.98
+        },
+        {
+          "id": "594d5ef901",
+          "text": "na",
+          "startMs": 150532,
+          "endMs": 150652,
+          "confidence": 0.99
+        },
+        {
+          "id": "eeb65f3f88",
+          "text": "chłoppa",
+          "startMs": 150692,
+          "endMs": 151273,
+          "confidence": 0.93
+        },
+        {
+          "id": "abf95d2d5c",
+          "text": "pesna",
+          "startMs": 151353,
+          "endMs": 152013,
+          "confidence": 0.87
+        },
+        {
+          "id": "5186a81526",
+          "text": "palony",
+          "startMs": 152093,
+          "endMs": 152774,
+          "confidence": 0.95
+        }
+      ]
+    },
+    {
+      "id": "7d64a926f7",
+      "start": 153.57,
+      "duration": 5.583,
+      "text": "Krują kierce skaczą łosywki My na podchalą przydzimy sieciwki",
+      "words": [
+        {
+          "id": "b23b8c5e84",
+          "text": "Krują",
+          "startMs": 153570,
+          "endMs": 153791,
+          "confidence": 0.42
+        },
+        {
+          "id": "2f0a12834d",
+          "text": "kierce",
+          "startMs": 153831,
+          "endMs": 154313,
+          "confidence": 0.83
+        },
+        {
+          "id": "e473aa3c84",
+          "text": "skaczą",
+          "startMs": 154353,
+          "endMs": 154976,
+          "confidence": 0.81
+        },
+        {
+          "id": "7fb80adc57",
+          "text": "łosywki",
+          "startMs": 155116,
+          "endMs": 156040,
+          "confidence": 0.88
+        },
+        {
+          "id": "d2140dca79",
+          "text": "My",
+          "startMs": 156140,
+          "endMs": 156321,
+          "confidence": 0.99
+        },
+        {
+          "id": "464da5be33",
+          "text": "na",
+          "startMs": 156381,
+          "endMs": 156643,
+          "confidence": 0.89
+        },
+        {
+          "id": "13a155ef81",
+          "text": "podchalą",
+          "startMs": 156703,
+          "endMs": 157426,
+          "confidence": 0.75
+        },
+        {
+          "id": "d17313e515",
+          "text": "przydzimy",
+          "startMs": 157446,
+          "endMs": 158149,
+          "confidence": 0.58
+        },
+        {
+          "id": "bdd9788460",
+          "text": "sieciwki",
+          "startMs": 158209,
+          "endMs": 159153,
+          "confidence": 0.75
+        }
+      ]
+    }
+  ]
+}

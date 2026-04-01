@@ -1,0 +1,1487 @@
+{
+  "provider": "whisperx",
+  "generatedAt": "2026-04-01T12:38:54.951568+00:00",
+  "warnings": [],
+  "lowConfidenceWordIds": [
+    "be4428b6ec",
+    "bdda2b8a30",
+    "2f47f2dbaf",
+    "1fd65e0765",
+    "f137441163",
+    "38b09ed498",
+    "a0c2f1db6a",
+    "0b91ca6ed0",
+    "a15bfcfeca",
+    "b27554bbb3",
+    "d966e89ad8",
+    "b8159c427f",
+    "3d70bdf602",
+    "e9b11b8b65",
+    "6e1c88b5c1",
+    "35c2f9a2ad",
+    "4cea368d91",
+    "4494aa8547",
+    "a352c5f114",
+    "6fa30df4e0"
+  ],
+  "cues": [
+    {
+      "id": "eae6b261fe",
+      "start": 12.578,
+      "duration": 2.302,
+      "text": "I tak od lat cały świat",
+      "words": [
+        {
+          "id": "d847532a07",
+          "text": "I",
+          "startMs": 12578,
+          "endMs": 12638,
+          "confidence": 0.67
+        },
+        {
+          "id": "067ae27033",
+          "text": "tak",
+          "startMs": 12738,
+          "endMs": 12978,
+          "confidence": 0.72
+        },
+        {
+          "id": "46ff57bec1",
+          "text": "od",
+          "startMs": 13018,
+          "endMs": 13118,
+          "confidence": 0.96
+        },
+        {
+          "id": "06643206ad",
+          "text": "lat",
+          "startMs": 13198,
+          "endMs": 13719,
+          "confidence": 0.95
+        },
+        {
+          "id": "7ecb440bd4",
+          "text": "cały",
+          "startMs": 13819,
+          "endMs": 14139,
+          "confidence": 0.93
+        },
+        {
+          "id": "39474f7396",
+          "text": "świat",
+          "startMs": 14199,
+          "endMs": 14880,
+          "confidence": 0.91
+        }
+      ]
+    },
+    {
+      "id": "23799356db",
+      "start": 14.96,
+      "duration": 2.242,
+      "text": "mówi wciąż nam jak mamy żyć",
+      "words": [
+        {
+          "id": "e92678bdba",
+          "text": "mówi",
+          "startMs": 14960,
+          "endMs": 15320,
+          "confidence": 0.86
+        },
+        {
+          "id": "deb127cf4a",
+          "text": "wciąż",
+          "startMs": 15360,
+          "endMs": 15700,
+          "confidence": 0.89
+        },
+        {
+          "id": "677ec90eb7",
+          "text": "nam",
+          "startMs": 15760,
+          "endMs": 16041,
+          "confidence": 1.0
+        },
+        {
+          "id": "3f24093099",
+          "text": "jak",
+          "startMs": 16101,
+          "endMs": 16281,
+          "confidence": 0.99
+        },
+        {
+          "id": "e11ea1db92",
+          "text": "mamy",
+          "startMs": 16381,
+          "endMs": 16821,
+          "confidence": 0.97
+        },
+        {
+          "id": "dab0a6055f",
+          "text": "żyć",
+          "startMs": 16861,
+          "endMs": 17202,
+          "confidence": 0.62
+        }
+      ]
+    },
+    {
+      "id": "9324997acb",
+      "start": 17.282,
+      "duration": 2.642,
+      "text": "twój pogląd nic nie jest wart",
+      "words": [
+        {
+          "id": "50d5397ffd",
+          "text": "twój",
+          "startMs": 17282,
+          "endMs": 17542,
+          "confidence": 0.95
+        },
+        {
+          "id": "0f2c32a2c9",
+          "text": "pogląd",
+          "startMs": 17642,
+          "endMs": 18102,
+          "confidence": 1.0
+        },
+        {
+          "id": "4e06d69195",
+          "text": "nic",
+          "startMs": 18162,
+          "endMs": 18863,
+          "confidence": 0.85
+        },
+        {
+          "id": "8e19abd66f",
+          "text": "nie",
+          "startMs": 18923,
+          "endMs": 19083,
+          "confidence": 0.79
+        },
+        {
+          "id": "be4428b6ec",
+          "text": "jest",
+          "startMs": 19123,
+          "endMs": 19243,
+          "confidence": 0.5
+        },
+        {
+          "id": "5f07207742",
+          "text": "wart",
+          "startMs": 19403,
+          "endMs": 19924,
+          "confidence": 0.94
+        }
+      ]
+    },
+    {
+      "id": "cbcf9d1b11",
+      "start": 20.184,
+      "duration": 2.202,
+      "text": "serio chcę jak zachód być",
+      "words": [
+        {
+          "id": "c0454215ca",
+          "text": "serio",
+          "startMs": 20184,
+          "endMs": 20644,
+          "confidence": 0.72
+        },
+        {
+          "id": "aa58e1cf0b",
+          "text": "chcę",
+          "startMs": 20704,
+          "endMs": 21024,
+          "confidence": 0.85
+        },
+        {
+          "id": "34f883dda8",
+          "text": "jak",
+          "startMs": 21065,
+          "endMs": 21265,
+          "confidence": 0.89
+        },
+        {
+          "id": "020f4c4e29",
+          "text": "zachód",
+          "startMs": 21325,
+          "endMs": 21865,
+          "confidence": 0.9
+        },
+        {
+          "id": "9e43ab8b3c",
+          "text": "być",
+          "startMs": 21945,
+          "endMs": 22386,
+          "confidence": 0.97
+        }
+      ]
+    },
+    {
+      "id": "0307cb010c",
+      "start": 22.446,
+      "duration": 2.441,
+      "text": "Na ulicy dziś zostanę",
+      "words": [
+        {
+          "id": "5f20c79254",
+          "text": "Na",
+          "startMs": 22446,
+          "endMs": 22626,
+          "confidence": 0.88
+        },
+        {
+          "id": "19938f23eb",
+          "text": "ulicy",
+          "startMs": 22686,
+          "endMs": 23026,
+          "confidence": 0.9
+        },
+        {
+          "id": "37f1603553",
+          "text": "dziś",
+          "startMs": 23066,
+          "endMs": 23266,
+          "confidence": 0.74
+        },
+        {
+          "id": "51ee233710",
+          "text": "zostanę",
+          "startMs": 23306,
+          "endMs": 24887,
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "id": "b34e2865b9",
+      "start": 24.988,
+      "duration": 2.521,
+      "text": "do asfaltu się przykleję",
+      "words": [
+        {
+          "id": "f1fb84a3a2",
+          "text": "do",
+          "startMs": 24988,
+          "endMs": 25088,
+          "confidence": 0.84
+        },
+        {
+          "id": "8267f4edb5",
+          "text": "asfaltu",
+          "startMs": 25148,
+          "endMs": 25748,
+          "confidence": 0.88
+        },
+        {
+          "id": "df5044f4bb",
+          "text": "się",
+          "startMs": 25788,
+          "endMs": 25948,
+          "confidence": 0.94
+        },
+        {
+          "id": "f35844c820",
+          "text": "przykleję",
+          "startMs": 26028,
+          "endMs": 27509,
+          "confidence": 0.98
+        }
+      ]
+    },
+    {
+      "id": "23bff07b25",
+      "start": 27.61,
+      "duration": 1.521,
+      "text": "O te prawa odebrane",
+      "words": [
+        {
+          "id": "6ccd41b343",
+          "text": "O",
+          "startMs": 27610,
+          "endMs": 27630,
+          "confidence": 1.0
+        },
+        {
+          "id": "bdda2b8a30",
+          "text": "te",
+          "startMs": 27690,
+          "endMs": 27750,
+          "confidence": 0.37
+        },
+        {
+          "id": "a26e4260d9",
+          "text": "prawa",
+          "startMs": 27850,
+          "endMs": 28170,
+          "confidence": 1.0
+        },
+        {
+          "id": "22d183344a",
+          "text": "odebrane",
+          "startMs": 28250,
+          "endMs": 29131,
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "id": "2e2b684a99",
+      "start": 29.151,
+      "duration": 3.723,
+      "text": "o planetę i nadzieję",
+      "words": [
+        {
+          "id": "2f47f2dbaf",
+          "text": "o",
+          "startMs": 29151,
+          "endMs": 29171,
+          "confidence": 0.0
+        },
+        {
+          "id": "562dd1b184",
+          "text": "planetę",
+          "startMs": 29351,
+          "endMs": 30272,
+          "confidence": 0.96
+        },
+        {
+          "id": "f79a171646",
+          "text": "i",
+          "startMs": 30292,
+          "endMs": 30472,
+          "confidence": 0.86
+        },
+        {
+          "id": "d6f3ae0cd4",
+          "text": "nadzieję",
+          "startMs": 30592,
+          "endMs": 32874,
+          "confidence": 0.78
+        }
+      ]
+    },
+    {
+      "id": "22db546d3b",
+      "start": 32.914,
+      "duration": 1.0,
+      "text": "walczyć chcę",
+      "words": [
+        {
+          "id": "1fd65e0765",
+          "text": "walczyć",
+          "startMs": 32914,
+          "endMs": 33174,
+          "confidence": 0.29
+        },
+        {
+          "id": "f137441163",
+          "text": "chcę",
+          "startMs": 33214,
+          "endMs": 33294,
+          "confidence": 0.25
+        }
+      ]
+    },
+    {
+      "id": "06c1661c45",
+      "start": 38.038,
+      "duration": 2.662,
+      "text": "Każdy z nas i każda z nas",
+      "words": [
+        {
+          "id": "a783fd9760",
+          "text": "Każdy",
+          "startMs": 38038,
+          "endMs": 38498,
+          "confidence": 0.98
+        },
+        {
+          "id": "deb4051f4d",
+          "text": "z",
+          "startMs": 38538,
+          "endMs": 38618,
+          "confidence": 0.83
+        },
+        {
+          "id": "a6fe41ee5a",
+          "text": "nas",
+          "startMs": 38678,
+          "endMs": 39159,
+          "confidence": 0.66
+        },
+        {
+          "id": "e0ca3c6a62",
+          "text": "i",
+          "startMs": 39199,
+          "endMs": 39259,
+          "confidence": 0.85
+        },
+        {
+          "id": "c783571065",
+          "text": "każda",
+          "startMs": 39319,
+          "endMs": 39799,
+          "confidence": 0.99
+        },
+        {
+          "id": "0378ec785f",
+          "text": "z",
+          "startMs": 39839,
+          "endMs": 39899,
+          "confidence": 0.96
+        },
+        {
+          "id": "1d38f73874",
+          "text": "nas",
+          "startMs": 39959,
+          "endMs": 40700,
+          "confidence": 0.94
+        }
+      ]
+    },
+    {
+      "id": "e587feded8",
+      "start": 40.76,
+      "duration": 2.221,
+      "text": "każde ono ich i jemu",
+      "words": [
+        {
+          "id": "2407ae5c60",
+          "text": "każde",
+          "startMs": 40760,
+          "endMs": 41240,
+          "confidence": 0.97
+        },
+        {
+          "id": "d20ace143e",
+          "text": "ono",
+          "startMs": 41340,
+          "endMs": 41720,
+          "confidence": 0.84
+        },
+        {
+          "id": "38b09ed498",
+          "text": "ich",
+          "startMs": 41800,
+          "endMs": 41980,
+          "confidence": 0.47
+        },
+        {
+          "id": "08fa5099a2",
+          "text": "i",
+          "startMs": 42100,
+          "endMs": 42120,
+          "confidence": 0.95
+        },
+        {
+          "id": "347c43c79f",
+          "text": "jemu",
+          "startMs": 42281,
+          "endMs": 42981,
+          "confidence": 0.96
+        }
+      ]
+    },
+    {
+      "id": "9b79409868",
+      "start": 43.041,
+      "duration": 2.882,
+      "text": "krzyczcie ze mną wszyscy wraz",
+      "words": [
+        {
+          "id": "4e4c7ff1a2",
+          "text": "krzyczcie",
+          "startMs": 43041,
+          "endMs": 43561,
+          "confidence": 0.75
+        },
+        {
+          "id": "e0fe63ef41",
+          "text": "ze",
+          "startMs": 43621,
+          "endMs": 43781,
+          "confidence": 0.98
+        },
+        {
+          "id": "5194a2532b",
+          "text": "mną",
+          "startMs": 43841,
+          "endMs": 44142,
+          "confidence": 0.97
+        },
+        {
+          "id": "9f65580f33",
+          "text": "wszyscy",
+          "startMs": 44182,
+          "endMs": 44802,
+          "confidence": 0.66
+        },
+        {
+          "id": "836102b853",
+          "text": "wraz",
+          "startMs": 44862,
+          "endMs": 45923,
+          "confidence": 0.61
+        }
+      ]
+    },
+    {
+      "id": "ccf839448b",
+      "start": 45.983,
+      "duration": 1.881,
+      "text": "nie pasuję do systemu",
+      "words": [
+        {
+          "id": "d6f51951bd",
+          "text": "nie",
+          "startMs": 45983,
+          "endMs": 46083,
+          "confidence": 0.76
+        },
+        {
+          "id": "67c0b1d89c",
+          "text": "pasuję",
+          "startMs": 46123,
+          "endMs": 46743,
+          "confidence": 0.97
+        },
+        {
+          "id": "68ff82f60d",
+          "text": "do",
+          "startMs": 46803,
+          "endMs": 46943,
+          "confidence": 0.74
+        },
+        {
+          "id": "8da48d2f72",
+          "text": "systemu",
+          "startMs": 47043,
+          "endMs": 47864,
+          "confidence": 0.95
+        }
+      ]
+    },
+    {
+      "id": "24c3a7f362",
+      "start": 48.004,
+      "duration": 2.862,
+      "text": "Sojowe latte niebieski włos",
+      "words": [
+        {
+          "id": "78ffc41c81",
+          "text": "Sojowe",
+          "startMs": 48004,
+          "endMs": 48644,
+          "confidence": 0.88
+        },
+        {
+          "id": "49a7a673e9",
+          "text": "latte",
+          "startMs": 48704,
+          "endMs": 49285,
+          "confidence": 0.92
+        },
+        {
+          "id": "67a8448a16",
+          "text": "niebieski",
+          "startMs": 49325,
+          "endMs": 49945,
+          "confidence": 0.76
+        },
+        {
+          "id": "35d918dd62",
+          "text": "włos",
+          "startMs": 50025,
+          "endMs": 50866,
+          "confidence": 0.78
+        }
+      ]
+    },
+    {
+      "id": "f2736e463e",
+      "start": 50.926,
+      "duration": 2.221,
+      "text": "to nasz orenż jest do życia",
+      "words": [
+        {
+          "id": "65b531387b",
+          "text": "to",
+          "startMs": 50926,
+          "endMs": 51046,
+          "confidence": 0.87
+        },
+        {
+          "id": "331fa3907e",
+          "text": "nasz",
+          "startMs": 51086,
+          "endMs": 51346,
+          "confidence": 0.84
+        },
+        {
+          "id": "013cab195f",
+          "text": "orenż",
+          "startMs": 51466,
+          "endMs": 51846,
+          "confidence": 0.66
+        },
+        {
+          "id": "a0c2f1db6a",
+          "text": "jest",
+          "startMs": 51886,
+          "endMs": 52126,
+          "confidence": 0.51
+        },
+        {
+          "id": "914f1319fc",
+          "text": "do",
+          "startMs": 52206,
+          "endMs": 52427,
+          "confidence": 0.97
+        },
+        {
+          "id": "52db4e0ad7",
+          "text": "życia",
+          "startMs": 52507,
+          "endMs": 53147,
+          "confidence": 0.73
+        }
+      ]
+    },
+    {
+      "id": "703a744d30",
+      "start": 53.187,
+      "duration": 2.521,
+      "text": "krzycz wyzwiska na cały głos",
+      "words": [
+        {
+          "id": "a7def25ff8",
+          "text": "krzycz",
+          "startMs": 53187,
+          "endMs": 53567,
+          "confidence": 0.61
+        },
+        {
+          "id": "b0fa62cdb5",
+          "text": "wyzwiska",
+          "startMs": 53587,
+          "endMs": 54248,
+          "confidence": 0.81
+        },
+        {
+          "id": "6da95588b8",
+          "text": "na",
+          "startMs": 54288,
+          "endMs": 54488,
+          "confidence": 0.87
+        },
+        {
+          "id": "99dfdd6691",
+          "text": "cały",
+          "startMs": 54548,
+          "endMs": 54968,
+          "confidence": 0.95
+        },
+        {
+          "id": "5b387ae6e5",
+          "text": "głos",
+          "startMs": 55008,
+          "endMs": 55708,
+          "confidence": 0.9
+        }
+      ]
+    },
+    {
+      "id": "3fb617fd57",
+      "start": 55.829,
+      "duration": 1.741,
+      "text": "rzuć kamieniem do kibica",
+      "words": [
+        {
+          "id": "831a350d25",
+          "text": "rzuć",
+          "startMs": 55829,
+          "endMs": 56089,
+          "confidence": 0.74
+        },
+        {
+          "id": "e4f196a3c4",
+          "text": "kamieniem",
+          "startMs": 56149,
+          "endMs": 57089,
+          "confidence": 0.89
+        },
+        {
+          "id": "9d064b953c",
+          "text": "do",
+          "startMs": 57129,
+          "endMs": 57269,
+          "confidence": 0.9
+        },
+        {
+          "id": "0b91ca6ed0",
+          "text": "kibica",
+          "startMs": 57409,
+          "endMs": 57570,
+          "confidence": 0.43
+        }
+      ]
+    },
+    {
+      "id": "34ef448f54",
+      "start": 57.63,
+      "duration": 1.0,
+      "text": "potem płacz",
+      "words": [
+        {
+          "id": "a15bfcfeca",
+          "text": "potem",
+          "startMs": 57630,
+          "endMs": 57750,
+          "confidence": 0.1
+        },
+        {
+          "id": "b27554bbb3",
+          "text": "płacz",
+          "startMs": 57790,
+          "endMs": 57910,
+          "confidence": 0.12
+        }
+      ]
+    },
+    {
+      "id": "8a5685eabb",
+      "start": 57.95,
+      "duration": 23.756,
+      "text": "Mam już dość czuję złość",
+      "words": [
+        {
+          "id": "d966e89ad8",
+          "text": "Mam",
+          "startMs": 57950,
+          "endMs": 58110,
+          "confidence": 0.5
+        },
+        {
+          "id": "b8159c427f",
+          "text": "już",
+          "startMs": 58130,
+          "endMs": 58270,
+          "confidence": 0.42
+        },
+        {
+          "id": "3d70bdf602",
+          "text": "dość",
+          "startMs": 81346,
+          "endMs": 81426,
+          "confidence": 0.0
+        },
+        {
+          "id": "e9b11b8b65",
+          "text": "czuję",
+          "startMs": 81446,
+          "endMs": 81546,
+          "confidence": 0.0
+        },
+        {
+          "id": "6e1c88b5c1",
+          "text": "złość",
+          "startMs": 81566,
+          "endMs": 81706,
+          "confidence": 0.2
+        }
+      ]
+    },
+    {
+      "id": "bf242def43",
+      "start": 81.726,
+      "duration": 1.901,
+      "text": "Jak można nie chołubić tuska",
+      "words": [
+        {
+          "id": "35c2f9a2ad",
+          "text": "Jak",
+          "startMs": 81726,
+          "endMs": 81786,
+          "confidence": 0.0
+        },
+        {
+          "id": "4cea368d91",
+          "text": "można",
+          "startMs": 81806,
+          "endMs": 81906,
+          "confidence": 0.1
+        },
+        {
+          "id": "4494aa8547",
+          "text": "nie",
+          "startMs": 81926,
+          "endMs": 81986,
+          "confidence": 0.0
+        },
+        {
+          "id": "0805abd232",
+          "text": "chołubić",
+          "startMs": 82046,
+          "endMs": 82906,
+          "confidence": 0.82
+        },
+        {
+          "id": "4d44cfa66f",
+          "text": "tuska",
+          "startMs": 82986,
+          "endMs": 83627,
+          "confidence": 0.96
+        }
+      ]
+    },
+    {
+      "id": "6e91ba1f7b",
+      "start": 83.667,
+      "duration": 2.54,
+      "text": "Chcę dziś hop zrobić hop",
+      "words": [
+        {
+          "id": "0be0912322",
+          "text": "Chcę",
+          "startMs": 83667,
+          "endMs": 83907,
+          "confidence": 0.82
+        },
+        {
+          "id": "4eccfad45c",
+          "text": "dziś",
+          "startMs": 83947,
+          "endMs": 84147,
+          "confidence": 0.59
+        },
+        {
+          "id": "9baa2399e9",
+          "text": "hop",
+          "startMs": 84247,
+          "endMs": 84887,
+          "confidence": 0.81
+        },
+        {
+          "id": "f53d776e0f",
+          "text": "zrobić",
+          "startMs": 84967,
+          "endMs": 85447,
+          "confidence": 0.88
+        },
+        {
+          "id": "3c424493ae",
+          "text": "hop",
+          "startMs": 85507,
+          "endMs": 86207,
+          "confidence": 0.76
+        }
+      ]
+    },
+    {
+      "id": "8bd7628702",
+      "start": 86.267,
+      "duration": 2.481,
+      "text": "prosto do kolegi łóżka",
+      "words": [
+        {
+          "id": "7569405b97",
+          "text": "prosto",
+          "startMs": 86267,
+          "endMs": 86948,
+          "confidence": 0.94
+        },
+        {
+          "id": "7535d6998c",
+          "text": "do",
+          "startMs": 86968,
+          "endMs": 87068,
+          "confidence": 0.99
+        },
+        {
+          "id": "e617d02c71",
+          "text": "kolegi",
+          "startMs": 87128,
+          "endMs": 87868,
+          "confidence": 0.99
+        },
+        {
+          "id": "f750a86e29",
+          "text": "łóżka",
+          "startMs": 88008,
+          "endMs": 88748,
+          "confidence": 0.75
+        }
+      ]
+    },
+    {
+      "id": "581d5dfaa2",
+      "start": 88.788,
+      "duration": 2.361,
+      "text": "Dwugodzinny pan prezydent",
+      "words": [
+        {
+          "id": "acb30f8509",
+          "text": "Dwugodzinny",
+          "startMs": 88788,
+          "endMs": 89568,
+          "confidence": 0.88
+        },
+        {
+          "id": "f06ddd8fce",
+          "text": "pan",
+          "startMs": 89648,
+          "endMs": 89888,
+          "confidence": 0.83
+        },
+        {
+          "id": "dc0a9a7f4f",
+          "text": "prezydent",
+          "startMs": 89948,
+          "endMs": 91149,
+          "confidence": 0.98
+        }
+      ]
+    },
+    {
+      "id": "2b5ef0f89d",
+      "start": 91.369,
+      "duration": 2.341,
+      "text": "liczy głosy on ma rację",
+      "words": [
+        {
+          "id": "59ec7e5252",
+          "text": "liczy",
+          "startMs": 91369,
+          "endMs": 91629,
+          "confidence": 0.78
+        },
+        {
+          "id": "193706ea71",
+          "text": "głosy",
+          "startMs": 91669,
+          "endMs": 92149,
+          "confidence": 0.93
+        },
+        {
+          "id": "a63472cc16",
+          "text": "on",
+          "startMs": 92229,
+          "endMs": 92409,
+          "confidence": 0.94
+        },
+        {
+          "id": "f5d5677134",
+          "text": "ma",
+          "startMs": 92449,
+          "endMs": 92649,
+          "confidence": 0.99
+        },
+        {
+          "id": "53439b0d55",
+          "text": "rację",
+          "startMs": 92689,
+          "endMs": 93710,
+          "confidence": 0.93
+        }
+      ]
+    },
+    {
+      "id": "8a330f7143",
+      "start": 93.77,
+      "duration": 2.08,
+      "text": "Nie mógł wygrać cham i prostak",
+      "words": [
+        {
+          "id": "08732f3c49",
+          "text": "Nie",
+          "startMs": 93770,
+          "endMs": 93970,
+          "confidence": 0.84
+        },
+        {
+          "id": "98e93f3375",
+          "text": "mógł",
+          "startMs": 94010,
+          "endMs": 94210,
+          "confidence": 0.86
+        },
+        {
+          "id": "5a5bb1be7a",
+          "text": "wygrać",
+          "startMs": 94250,
+          "endMs": 94610,
+          "confidence": 0.9
+        },
+        {
+          "id": "92a53805b5",
+          "text": "cham",
+          "startMs": 94690,
+          "endMs": 94950,
+          "confidence": 0.87
+        },
+        {
+          "id": "3d8f4a2c7f",
+          "text": "i",
+          "startMs": 94970,
+          "endMs": 95030,
+          "confidence": 0.98
+        },
+        {
+          "id": "2597e79723",
+          "text": "prostak",
+          "startMs": 95110,
+          "endMs": 95850,
+          "confidence": 0.91
+        }
+      ]
+    },
+    {
+      "id": "582a9bf6c9",
+      "start": 95.91,
+      "duration": 2.941,
+      "text": "więc otwarcie i zażarcie",
+      "words": [
+        {
+          "id": "3fa1bb0ded",
+          "text": "więc",
+          "startMs": 95910,
+          "endMs": 96250,
+          "confidence": 0.91
+        },
+        {
+          "id": "36c3a5681c",
+          "text": "otwarcie",
+          "startMs": 96290,
+          "endMs": 97251,
+          "confidence": 0.87
+        },
+        {
+          "id": "f57d4cf1ce",
+          "text": "i",
+          "startMs": 97291,
+          "endMs": 97371,
+          "confidence": 0.91
+        },
+        {
+          "id": "f098adcac7",
+          "text": "zażarcie",
+          "startMs": 97431,
+          "endMs": 98851,
+          "confidence": 0.91
+        }
+      ]
+    },
+    {
+      "id": "e73f0c3b7d",
+      "start": 98.991,
+      "duration": 2.361,
+      "text": "wołam",
+      "words": [
+        {
+          "id": "44e840f46a",
+          "text": "wołam",
+          "startMs": 98991,
+          "endMs": 101352,
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "id": "3b81dc3022",
+      "start": 101.492,
+      "duration": 2.481,
+      "text": "je bać pis",
+      "words": [
+        {
+          "id": "5ba242c4fb",
+          "text": "je",
+          "startMs": 101492,
+          "endMs": 101652,
+          "confidence": 0.96
+        },
+        {
+          "id": "39677905a1",
+          "text": "bać",
+          "startMs": 101692,
+          "endMs": 102052,
+          "confidence": 0.86
+        },
+        {
+          "id": "8c9be8bb56",
+          "text": "pis",
+          "startMs": 102132,
+          "endMs": 103973,
+          "confidence": 0.67
+        }
+      ]
+    },
+    {
+      "id": "4a093c045e",
+      "start": 104.033,
+      "duration": 2.66,
+      "text": "Każdy z nas i każda z nas",
+      "words": [
+        {
+          "id": "b60ae5b43e",
+          "text": "Każdy",
+          "startMs": 104033,
+          "endMs": 104493,
+          "confidence": 0.96
+        },
+        {
+          "id": "da0ef78cc3",
+          "text": "z",
+          "startMs": 104553,
+          "endMs": 104613,
+          "confidence": 0.71
+        },
+        {
+          "id": "9a4aa08511",
+          "text": "nas",
+          "startMs": 104693,
+          "endMs": 105153,
+          "confidence": 0.97
+        },
+        {
+          "id": "8e78d807bf",
+          "text": "i",
+          "startMs": 105213,
+          "endMs": 105273,
+          "confidence": 0.87
+        },
+        {
+          "id": "89be17206c",
+          "text": "każda",
+          "startMs": 105313,
+          "endMs": 105793,
+          "confidence": 0.97
+        },
+        {
+          "id": "9f8c2b7012",
+          "text": "z",
+          "startMs": 105833,
+          "endMs": 105913,
+          "confidence": 0.96
+        },
+        {
+          "id": "12e6bb7e25",
+          "text": "nas",
+          "startMs": 105953,
+          "endMs": 106693,
+          "confidence": 0.94
+        }
+      ]
+    },
+    {
+      "id": "fe6c01d6e8",
+      "start": 106.773,
+      "duration": 2.281,
+      "text": "każde ono ich i jemu",
+      "words": [
+        {
+          "id": "e24b421c44",
+          "text": "każde",
+          "startMs": 106773,
+          "endMs": 107213,
+          "confidence": 0.99
+        },
+        {
+          "id": "b14859afed",
+          "text": "ono",
+          "startMs": 107394,
+          "endMs": 107714,
+          "confidence": 0.92
+        },
+        {
+          "id": "6263bdfb74",
+          "text": "ich",
+          "startMs": 107814,
+          "endMs": 108014,
+          "confidence": 0.73
+        },
+        {
+          "id": "530eccabc0",
+          "text": "i",
+          "startMs": 108034,
+          "endMs": 108054,
+          "confidence": 0.68
+        },
+        {
+          "id": "42d01ed001",
+          "text": "jemu",
+          "startMs": 108314,
+          "endMs": 109054,
+          "confidence": 0.68
+        }
+      ]
+    },
+    {
+      "id": "acd8278221",
+      "start": 109.41,
+      "duration": 2.502,
+      "text": "krzyczcie ze mną wszyscy wraz",
+      "words": [
+        {
+          "id": "a352c5f114",
+          "text": "krzyczcie",
+          "startMs": 109410,
+          "endMs": 109590,
+          "confidence": 0.0
+        },
+        {
+          "id": "b05b93b453",
+          "text": "ze",
+          "startMs": 109610,
+          "endMs": 109770,
+          "confidence": 1.0
+        },
+        {
+          "id": "bc84e78ed4",
+          "text": "mną",
+          "startMs": 109830,
+          "endMs": 110111,
+          "confidence": 0.95
+        },
+        {
+          "id": "a7d48ef3e1",
+          "text": "wszyscy",
+          "startMs": 110171,
+          "endMs": 110771,
+          "confidence": 0.92
+        },
+        {
+          "id": "6720d79b07",
+          "text": "wraz",
+          "startMs": 110831,
+          "endMs": 111912,
+          "confidence": 0.96
+        }
+      ]
+    },
+    {
+      "id": "6ad9544b6d",
+      "start": 111.972,
+      "duration": 1.922,
+      "text": "nie pasuję do systemu",
+      "words": [
+        {
+          "id": "50dbde658e",
+          "text": "nie",
+          "startMs": 111972,
+          "endMs": 112093,
+          "confidence": 0.83
+        },
+        {
+          "id": "6e56edfeba",
+          "text": "pasuję",
+          "startMs": 112153,
+          "endMs": 112793,
+          "confidence": 0.96
+        },
+        {
+          "id": "06cfa3b279",
+          "text": "do",
+          "startMs": 112833,
+          "endMs": 112973,
+          "confidence": 0.9
+        },
+        {
+          "id": "be3733959b",
+          "text": "systemu",
+          "startMs": 113073,
+          "endMs": 113894,
+          "confidence": 0.99
+        }
+      ]
+    },
+    {
+      "id": "2d63c39be7",
+      "start": 113.974,
+      "duration": 2.883,
+      "text": "Sojowe latte niebieski włos",
+      "words": [
+        {
+          "id": "35c9256f12",
+          "text": "Sojowe",
+          "startMs": 113974,
+          "endMs": 114655,
+          "confidence": 0.96
+        },
+        {
+          "id": "507fb7068a",
+          "text": "latte",
+          "startMs": 114695,
+          "endMs": 115276,
+          "confidence": 0.86
+        },
+        {
+          "id": "f5d9a39f3f",
+          "text": "niebieski",
+          "startMs": 115316,
+          "endMs": 115876,
+          "confidence": 0.9
+        },
+        {
+          "id": "e3d3330ce9",
+          "text": "włos",
+          "startMs": 116016,
+          "endMs": 116857,
+          "confidence": 0.83
+        }
+      ]
+    },
+    {
+      "id": "1b1461534a",
+      "start": 116.917,
+      "duration": 2.242,
+      "text": "to nasz orenż jest do życia",
+      "words": [
+        {
+          "id": "9d173ed97f",
+          "text": "to",
+          "startMs": 116917,
+          "endMs": 117037,
+          "confidence": 0.9
+        },
+        {
+          "id": "68be124d70",
+          "text": "nasz",
+          "startMs": 117077,
+          "endMs": 117337,
+          "confidence": 0.92
+        },
+        {
+          "id": "c6cc3752f1",
+          "text": "orenż",
+          "startMs": 117458,
+          "endMs": 117838,
+          "confidence": 0.74
+        },
+        {
+          "id": "d738c45e3d",
+          "text": "jest",
+          "startMs": 117898,
+          "endMs": 118138,
+          "confidence": 0.87
+        },
+        {
+          "id": "f8a7f071d2",
+          "text": "do",
+          "startMs": 118178,
+          "endMs": 118439,
+          "confidence": 0.96
+        },
+        {
+          "id": "aeb581bc4f",
+          "text": "życia",
+          "startMs": 118499,
+          "endMs": 119159,
+          "confidence": 0.8
+        }
+      ]
+    },
+    {
+      "id": "acc809a29a",
+      "start": 119.219,
+      "duration": 2.503,
+      "text": "krzycz wyzwiska na cały głos",
+      "words": [
+        {
+          "id": "aec09fdfc3",
+          "text": "krzycz",
+          "startMs": 119219,
+          "endMs": 119560,
+          "confidence": 0.91
+        },
+        {
+          "id": "8bd7bcbe2e",
+          "text": "wyzwiska",
+          "startMs": 119580,
+          "endMs": 120220,
+          "confidence": 0.68
+        },
+        {
+          "id": "1325b12ba2",
+          "text": "na",
+          "startMs": 120260,
+          "endMs": 120460,
+          "confidence": 0.92
+        },
+        {
+          "id": "fe3a4cf444",
+          "text": "cały",
+          "startMs": 120541,
+          "endMs": 120961,
+          "confidence": 0.96
+        },
+        {
+          "id": "b87ab4f795",
+          "text": "głos",
+          "startMs": 121041,
+          "endMs": 121722,
+          "confidence": 0.75
+        }
+      ]
+    },
+    {
+      "id": "e622ef8fb1",
+      "start": 121.822,
+      "duration": 2.502,
+      "text": "rzuć kamieniem do kibica",
+      "words": [
+        {
+          "id": "2635888a91",
+          "text": "rzuć",
+          "startMs": 121822,
+          "endMs": 122062,
+          "confidence": 0.86
+        },
+        {
+          "id": "578b8155a0",
+          "text": "kamieniem",
+          "startMs": 122122,
+          "endMs": 123063,
+          "confidence": 0.92
+        },
+        {
+          "id": "df7c79bbf6",
+          "text": "do",
+          "startMs": 123123,
+          "endMs": 123283,
+          "confidence": 0.98
+        },
+        {
+          "id": "0b541969f4",
+          "text": "kibica",
+          "startMs": 123383,
+          "endMs": 124324,
+          "confidence": 0.85
+        }
+      ]
+    },
+    {
+      "id": "08206752ed",
+      "start": 124.404,
+      "duration": 1.221,
+      "text": "potem płacz",
+      "words": [
+        {
+          "id": "68f99719aa",
+          "text": "potem",
+          "startMs": 124404,
+          "endMs": 124925,
+          "confidence": 0.97
+        },
+        {
+          "id": "6fa30df4e0",
+          "text": "płacz",
+          "startMs": 125005,
+          "endMs": 125625,
+          "confidence": 0.32
+        }
+      ]
+    }
+  ]
+}

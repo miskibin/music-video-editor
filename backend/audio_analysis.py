@@ -24,6 +24,16 @@ def _fold_bpm(bpm: float, *, min_bpm: float = MIN_TEMPO_BPM, max_bpm: float = MA
     return bpm
 
 
+def _beat_track_start_bpm(tempo_hint: float) -> float:
+    """Avoid librosa locking to ~2x the perceived tempo (common with eighth-note emphasis)."""
+    if tempo_hint <= 0:
+        return 120.0
+    h = _fold_bpm(tempo_hint)
+    if h > 145 and (h / 2.0) >= MIN_TEMPO_BPM:
+        h = h / 2.0
+    return float(np.clip(h, MIN_TEMPO_BPM, MAX_TEMPO_BPM))
+
+
 def _estimate_section_count(duration_sec: float, min_section_duration: float, max_sections: int) -> int:
     estimated = max(2, round(duration_sec / min_section_duration))
     return min(max_sections, estimated)
@@ -107,9 +117,9 @@ def analyze_audio_structure(
         onset_envelope=onset_envelope,
         sr=sample_rate,
         hop_length=HOP_LENGTH,
-        start_bpm=tempo_hint if tempo_hint > 0 else 120.0,
+        start_bpm=_beat_track_start_bpm(tempo_hint),
     )
-    tempo_bpm = tempo_hint if tempo_hint > 0 else _normalize_float(tempo)
+    tempo_bpm = round(_fold_bpm(_normalize_float(tempo)), 2)
     beat_times = librosa.frames_to_time(beat_frames, sr=sample_rate, hop_length=HOP_LENGTH)
 
     section_count = _estimate_section_count(duration_sec, min_section_duration, max_sections)

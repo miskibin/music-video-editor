@@ -1,0 +1,12 @@
+tempo: 155bpm
+
+structure:
+
+Intro: 0-12s
+verse 1: 12-54
+chorus: 54-1:20
+verse 2: 1:20-2:44
+solo: 1:51:02:03
+bridge: 02:03:02:20
+chorus 2:20:2:46
+solo: 2:46-3:10
