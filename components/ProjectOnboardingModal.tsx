@@ -9,7 +9,6 @@ import type { SubtitleAlignmentInput, SubtitleCue } from '@/lib/types';
 import type { SubtitleAlignmentState } from '@/lib/types';
 import type { AudioAnalysisResult } from '@/lib/audio-analysis-types';
 import { getEffectiveSectionBoundaries } from '@/lib/audio-analysis';
-import type { MelSpectrogramResult } from '@/lib/mel-spectrogram';
 import { defaultHeuristicSectionLabels } from '@/lib/section-labels';
 
 export type WizardStep = 0 | 1 | 2;
@@ -22,14 +21,18 @@ type Props = {
   alignmentState: SubtitleAlignmentState;
   subtitleAlignmentInput: SubtitleAlignmentInput;
   analysis: AudioAnalysisResult | null;
-  mel: MelSpectrogramResult | null;
   analysisLoading: boolean;
-  melLoading: boolean;
+  waveformPeaks: number[];
+  playheadSec: number;
+  isPlaying: boolean;
   boundaryInternals: number[];
   sectionLabels: string[];
   onUploadMusicFile: (file: File) => void | Promise<void>;
   onRunSubtitleAlignment: (input: SubtitleAlignmentInput) => void | Promise<void>;
   onApplyLyrics: (cues: SubtitleCue[]) => void;
+  onSeekAudio: (timeSec: number) => void;
+  onPlayAudio: () => void | Promise<void>;
+  onPauseAudio: () => void;
   onFinishSetup: (payload: {
     analysis: AudioAnalysisResult;
     boundaryOverrides: number[] | null;
@@ -50,14 +53,18 @@ export default function ProjectOnboardingModal({
   alignmentState,
   subtitleAlignmentInput,
   analysis,
-  mel,
   analysisLoading,
-  melLoading,
+  waveformPeaks,
+  playheadSec,
+  isPlaying,
   boundaryInternals,
   sectionLabels,
   onUploadMusicFile,
   onRunSubtitleAlignment,
   onApplyLyrics,
+  onSeekAudio,
+  onPlayAudio,
+  onPauseAudio,
   onFinishSetup,
 }: Props) {
   const [locals, setLocals] = useState<number[]>([]);
@@ -194,10 +201,14 @@ export default function ProjectOnboardingModal({
                 ) : (
                   <AudioAnalysisReview
                     analysis={analysis}
-                    mel={mel}
-                    melLoading={melLoading}
+                    waveformPeaks={waveformPeaks}
+                    playheadSec={playheadSec}
+                    isPlaying={isPlaying}
                     internalBoundaries={internalsForReview}
                     sectionLabels={labelsForReview}
+                    onSeekAudio={onSeekAudio}
+                    onPlayAudio={onPlayAudio}
+                    onPauseAudio={onPauseAudio}
                     onInternalBoundariesChange={(next) => {
                       setLocals(next);
                     }}

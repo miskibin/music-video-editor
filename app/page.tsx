@@ -71,7 +71,6 @@ import {
   buildSmartSplitMarkers,
   type AudioAnalysisResult,
 } from '@/lib/audio-analysis';
-import { computeMelSpectrogramFromBlob, type MelSpectrogramResult } from '@/lib/mel-spectrogram';
 import {
   estimateBpmFromAudioUrl,
   extractWaveformPeaks,
@@ -202,9 +201,7 @@ export default function Editor() {
   const [renderMessage, setRenderMessage] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState<WizardStep>(0);
   const [wizardAnalysis, setWizardAnalysis] = useState<AudioAnalysisResult | null>(null);
-  const [wizardMel, setWizardMel] = useState<MelSpectrogramResult | null>(null);
   const [wizardAnalysisLoading, setWizardAnalysisLoading] = useState(false);
-  const [wizardMelLoading, setWizardMelLoading] = useState(false);
   const [isGeneratingSplitMarkers, setIsGeneratingSplitMarkers] = useState(false);
   const [hasHydratedProject, setHasHydratedProject] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -239,7 +236,6 @@ export default function Editor() {
   );
   useEffect(() => {
     setWizardAnalysis(null);
-    setWizardMel(null);
   }, [musicClip?.assetId]);
   const sortedTextClips = useMemo(
     () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === TEXT_TRACK_ID)),
@@ -333,19 +329,13 @@ export default function Editor() {
     let cancelled = false;
     (async () => {
       setWizardAnalysisLoading(true);
-      setWizardMelLoading(true);
       setWizardAnalysis(null);
-      setWizardMel(null);
       try {
-        const [a, m] = await Promise.all([
-          analyzeAudio(blob, { minSectionDuration: 7, maxSections: 12 }),
-          computeMelSpectrogramFromBlob(blob),
-        ]);
+        const a = await analyzeAudio(blob, { minSectionDuration: 7, maxSections: 12 });
         if (cancelled) {
           return;
         }
         setWizardAnalysis(a);
-        setWizardMel(m);
       } catch (error) {
         if (!cancelled) {
           toast.error(error instanceof Error ? error.message : 'Audio analysis failed');
@@ -353,7 +343,6 @@ export default function Editor() {
       } finally {
         if (!cancelled) {
           setWizardAnalysisLoading(false);
-          setWizardMelLoading(false);
         }
       }
     })();
@@ -710,7 +699,6 @@ export default function Editor() {
     });
     setWizardStep(0);
     setWizardAnalysis(null);
-    setWizardMel(null);
   }, []);
 
   const handleAddSubtitleCue = useCallback(() => {
@@ -1159,6 +1147,20 @@ export default function Editor() {
     handleTimeChange(clamp(currentTime + delta, 0, clipEnd));
   }, [currentTime, handleTimeChange, musicClip]);
 
+  const onboardingPlayheadSec = useMemo(() => {
+    if (!musicClip) {
+      return 0;
+    }
+    return clamp(currentTime - musicClip.start, 0, musicClip.duration);
+  }, [currentTime, musicClip]);
+
+  const handleOnboardingSeek = useCallback((timeSec: number) => {
+    if (!musicClip) {
+      return;
+    }
+    handleTimeChange(musicClip.start + clamp(timeSec, 0, musicClip.duration));
+  }, [handleTimeChange, musicClip]);
+
   useEffect(() => {
     audioRef.current = new Audio();
     audioRef.current.preload = 'auto';
@@ -1555,14 +1557,18 @@ export default function Editor() {
           alignmentState={project.lyricSync.subtitleAlignment}
           subtitleAlignmentInput={subtitleAlignmentInput}
           analysis={wizardAnalysis}
-          mel={wizardMel}
           analysisLoading={wizardAnalysisLoading}
-          melLoading={wizardMelLoading}
+          waveformPeaks={musicClip?.waveform ?? []}
+          playheadSec={onboardingPlayheadSec}
+          isPlaying={isPlaying}
           boundaryInternals={onboardingBoundaryInternals}
           sectionLabels={onboardingSectionLabels}
           onUploadMusicFile={handleUploadMusic}
           onRunSubtitleAlignment={handleRunSubtitleAlignment}
           onApplyLyrics={handleApplySubtitleAlignment}
+          onSeekAudio={handleOnboardingSeek}
+          onPlayAudio={handlePlay}
+          onPauseAudio={handlePause}
           onFinishSetup={handleFinishOnboarding}
         />
       ) : null}
