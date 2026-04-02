@@ -9,6 +9,7 @@ import {
   LyricSyncState,
   MotionConfig,
   MusicClip,
+  ProjectSetupState,
   SplitPartRangePreset,
   SplitPlanningState,
   SubtitleAlignmentInput,
@@ -21,9 +22,11 @@ import {
   Track,
   TransitionConfig,
 } from './types';
+import type { AudioStructureState } from './audio-analysis-types';
+import type { AudioAnalysisResult } from './audio-analysis-types';
 import { colorForBackgroundSegment } from './visual-clip-colors';
 
-export const PROJECT_VERSION = 3 as const;
+export const PROJECT_VERSION = 4 as const;
 export const ACTIVE_PROJECT_ID = 'active-project';
 export const BACKGROUND_TRACK_ID = 'v1' as const;
 export const SUBTITLE_TRACK_ID = 't1' as const;
@@ -188,6 +191,21 @@ const splitPlanningStateSchema = z.object({
   generatedAt: z.string().nullable().default(null),
 });
 
+const audioAnalysisResultSchema = z.any();
+
+const audioStructureStateSchema: z.ZodType<AudioStructureState> = z.object({
+  analysis: audioAnalysisResultSchema.nullable(),
+  boundaryOverrides: z.array(z.number()).nullable(),
+  sectionLabels: z.array(z.string()).nullable(),
+  analysisAssetId: z.string().nullable(),
+  generatedAt: z.string().nullable(),
+});
+
+const projectSetupStateSchema = z.object({
+  status: z.enum(['incomplete', 'complete']),
+  completedAt: z.string().optional(),
+});
+
 const lyricSyncStateSchema = z.object({
   subtitleAlignment: subtitleAlignmentStateSchema,
 });
@@ -241,53 +259,8 @@ const editorProjectSchema = z.object({
   splitPlanning: splitPlanningStateSchema,
   mediaLibraryAssetIds: z.array(z.string()).default([]),
   lyricSync: lyricSyncStateSchema,
-});
-
-const legacyPhase3ProjectSchema = z.object({
-  version: z.literal(PROJECT_VERSION),
-  id: z.string(),
-  name: z.string(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  format: z.object({
-    aspectRatio: z.literal('9:16'),
-    width: z.number().min(1),
-    height: z.number().min(1),
-  }),
-  music: z.object({
-    trackId: z.literal(MUSIC_TRACK_ID),
-    clip: musicClipSchema.nullable(),
-  }),
-  subtitles: subtitleLayerSchema,
-  background: z.object({
-    trackId: z.literal(BACKGROUND_TRACK_ID),
-    segments: z.array(backgroundSegmentSchema),
-  }),
-  assets: z.record(z.string(), assetRecordSchema),
-  splitPlanning: splitPlanningStateSchema.optional(),
-  mediaLibraryAssetIds: z.array(z.string()).optional(),
-  phase3: lyricSyncStateSchema,
-});
-
-const legacyEditorProjectSchema = z.object({
-  version: z.literal(2),
-  id: z.string(),
-  name: z.string(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  format: z.object({
-    aspectRatio: z.literal('9:16'),
-    width: z.number().min(1),
-    height: z.number().min(1),
-  }),
-  music: z.object({
-    trackId: z.literal(MUSIC_TRACK_ID),
-    clip: musicClipSchema.nullable(),
-  }),
-  subtitles: subtitleLayerSchema,
-  background: backgroundLayerSchema,
-  assets: z.record(z.string(), assetRecordSchema),
-  splitPlanning: splitPlanningStateSchema.optional(),
+  projectSetup: projectSetupStateSchema,
+  audioStructure: audioStructureStateSchema,
 });
 
 const nowIso = () => new Date().toISOString();
@@ -348,28 +321,17 @@ const createDefaultSplitPlanningState = (
   generatedAt: null,
 });
 
-const migrateLegacyProject = (legacyProject: z.infer<typeof legacyEditorProjectSchema>): EditorProject => ({
-  ...legacyProject,
-  version: PROJECT_VERSION,
-  lyricSync: createDefaultLyricSyncState(legacyProject),
-  splitPlanning: legacyProject.splitPlanning ?? createDefaultSplitPlanningState(),
-  mediaLibraryAssetIds: [],
-}) as EditorProject;
+export const createDefaultProjectSetupState = (): ProjectSetupState => ({
+  status: 'incomplete',
+});
 
-const migrateLegacyPhase3Project = (legacyProject: z.infer<typeof legacyPhase3ProjectSchema>): EditorProject => {
-  const { phase3, ...project } = legacyProject;
-
-  return {
-    ...project,
-    subtitles: {
-      ...project.subtitles,
-      subtitleStyle: project.subtitles.subtitleStyle ?? createDefaultSubtitleStyle(),
-    },
-    lyricSync: phase3,
-    splitPlanning: legacyProject.splitPlanning ?? createDefaultSplitPlanningState(),
-    mediaLibraryAssetIds: legacyProject.mediaLibraryAssetIds ?? [],
-  } as EditorProject;
-};
+export const createDefaultAudioStructureState = (): AudioStructureState => ({
+  analysis: null,
+  boundaryOverrides: null,
+  sectionLabels: null,
+  analysisAssetId: null,
+  generatedAt: null,
+});
 
 export const createId = () => Math.random().toString(36).substring(2, 9);
 
@@ -433,6 +395,8 @@ export const normalizeEditorProject = (project: EditorProject): EditorProject =>
 
   return {
     ...project,
+    projectSetup: project.projectSetup ?? createDefaultProjectSetupState(),
+    audioStructure: project.audioStructure ?? createDefaultAudioStructureState(),
     subtitles: {
       ...project.subtitles,
       subtitleStyle: {
@@ -525,6 +489,8 @@ export const createDefaultProject = (): EditorProject => {
     assets: {},
     splitPlanning: createDefaultSplitPlanningState(),
     mediaLibraryAssetIds: [],
+    projectSetup: createDefaultProjectSetupState(),
+    audioStructure: createDefaultAudioStructureState(),
   };
 
   return {
@@ -693,18 +659,7 @@ export const pruneUnusedAssets = (project: EditorProject): EditorProject => {
 
 export const parseProjectDocument = (candidate: unknown): EditorProject => {
   const parsed = editorProjectSchema.safeParse(candidate);
-
   if (!parsed.success) {
-    const legacyPhase3Parsed = legacyPhase3ProjectSchema.safeParse(candidate);
-    if (legacyPhase3Parsed.success) {
-      return normalizeEditorProject(pruneUnusedAssets(migrateLegacyPhase3Project(legacyPhase3Parsed.data)));
-    }
-
-    const legacyParsed = legacyEditorProjectSchema.safeParse(candidate);
-    if (legacyParsed.success) {
-      return normalizeEditorProject(pruneUnusedAssets(migrateLegacyProject(legacyParsed.data)));
-    }
-
     return createDefaultProject();
   }
 
@@ -726,6 +681,10 @@ export const sanitizeProjectAgainstMissingAssets = (
   );
   const nextLibraryIds = project.mediaLibraryAssetIds.filter((id) => availableAssetIds.has(id));
 
+  const clearedAudio = !nextMusicClip
+    ? createDefaultAudioStructureState()
+    : project.audioStructure;
+
   return pruneUnusedAssets({
     ...project,
     music: {
@@ -738,6 +697,8 @@ export const sanitizeProjectAgainstMissingAssets = (
     },
     assets: nextAssets,
     mediaLibraryAssetIds: nextLibraryIds,
+    audioStructure: clearedAudio,
+    projectSetup: !nextMusicClip ? createDefaultProjectSetupState() : project.projectSetup,
   });
 };
 
@@ -1028,7 +989,39 @@ export const replaceMusicClip = (
     generatedAt: null,
     markers: [],
   },
+  projectSetup: createDefaultProjectSetupState(),
+  audioStructure: createDefaultAudioStructureState(),
 }));
+
+export const storeAudioStructure = (
+  project: EditorProject,
+  payload: Partial<AudioStructureState> & {
+    analysis?: AudioAnalysisResult | null;
+  },
+): EditorProject => {
+  const nextAnalysis = payload.analysis !== undefined ? payload.analysis : project.audioStructure.analysis;
+  const generatedAt = payload.generatedAt !== undefined
+    ? payload.generatedAt
+    : (payload.analysis !== undefined && payload.analysis !== null ? nowIso() : project.audioStructure.generatedAt);
+
+  return markProjectUpdated({
+    ...project,
+    audioStructure: {
+      ...project.audioStructure,
+      ...payload,
+      analysis: nextAnalysis,
+      generatedAt,
+    },
+  });
+};
+
+export const completeProjectSetup = (project: EditorProject): EditorProject => markProjectUpdated({
+  ...project,
+  projectSetup: {
+    status: 'complete',
+    completedAt: nowIso(),
+  },
+});
 
 export const appendBackgroundSegment = (
   project: EditorProject,
@@ -1218,6 +1211,8 @@ export const deleteTimelineClipFromProject = (
         generatedAt: null,
         markers: [],
       },
+      projectSetup: createDefaultProjectSetupState(),
+      audioStructure: createDefaultAudioStructureState(),
     }));
   }
 

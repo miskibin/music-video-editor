@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import TopBar from '@/components/TopBar';
 import Sidebar from '@/components/Sidebar';
 import SubtitleAlignmentModal from '@/components/SubtitleAlignmentModal';
+import ProjectOnboardingModal, { type WizardStep } from '@/components/ProjectOnboardingModal';
 import VideoPreview from '@/components/VideoPreview';
 import MediaGalleryPanel from '@/components/MediaGalleryPanel';
 import Timeline from '@/components/Timeline';
@@ -43,6 +44,8 @@ import {
   parseProjectDocument,
   replaceMusicClip,
   sanitizeProjectAgainstMissingAssets,
+  storeAudioStructure,
+  completeProjectSetup,
   setSplitPlanningPreset,
   startSubtitleAlignment,
   storeSplitMarkers,
@@ -68,6 +71,7 @@ import {
   buildSmartSplitMarkers,
   type AudioAnalysisResult,
 } from '@/lib/audio-analysis';
+import { computeMelSpectrogramFromBlob, type MelSpectrogramResult } from '@/lib/mel-spectrogram';
 import {
   estimateBpmFromAudioUrl,
   extractWaveformPeaks,
@@ -196,7 +200,11 @@ export default function Editor() {
   const [renderState, setRenderState] = useState<RenderState>('idle');
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderMessage, setRenderMessage] = useState<string | null>(null);
-  const [musicAnalysis, setMusicAnalysis] = useState<{ assetId: string; result: AudioAnalysisResult } | null>(null);
+  const [wizardStep, setWizardStep] = useState<WizardStep>(0);
+  const [wizardAnalysis, setWizardAnalysis] = useState<AudioAnalysisResult | null>(null);
+  const [wizardMel, setWizardMel] = useState<MelSpectrogramResult | null>(null);
+  const [wizardAnalysisLoading, setWizardAnalysisLoading] = useState(false);
+  const [wizardMelLoading, setWizardMelLoading] = useState(false);
   const [isGeneratingSplitMarkers, setIsGeneratingSplitMarkers] = useState(false);
   const [hasHydratedProject, setHasHydratedProject] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -230,12 +238,8 @@ export default function Editor() {
     [timelineClips],
   );
   useEffect(() => {
-    if (!musicClip?.assetId) {
-      setMusicAnalysis(null);
-      return;
-    }
-
-    setMusicAnalysis((current) => (current?.assetId === musicClip.assetId ? current : null));
+    setWizardAnalysis(null);
+    setWizardMel(null);
   }, [musicClip?.assetId]);
   const sortedTextClips = useMemo(
     () => sortClipsByStart(timelineClips.filter((clip) => clip.trackId === TEXT_TRACK_ID)),
@@ -292,6 +296,10 @@ export default function Editor() {
     const musicAssetId = project.music.clip?.assetId;
     return renderState === 'rendering' || !musicAssetId || !assetBlobs[musicAssetId];
   }, [assetBlobs, project.music.clip?.assetId, renderState]);
+  const setupComplete = project.projectSetup.status === 'complete';
+  const showOnboarding = hasHydratedProject && !setupComplete;
+  const onboardingBoundaryInternals = project.audioStructure.boundaryOverrides ?? [];
+  const onboardingSectionLabels = project.audioStructure.sectionLabels ?? [];
   const renderPreviewManifest = useMemo<RenderManifest | null>(() => {
     try {
       return createRenderManifest(project, assetUrls);
@@ -309,17 +317,51 @@ export default function Editor() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [project, referencedAssetIdsForGallery]);
 
-  const analyzeMusicSource = useCallback(async (audioBlob: Blob, previewUrl: string) => {
-    const [analysisResult, fallbackBpm] = await Promise.all([
-      analyzeAudio(audioBlob, { minSectionDuration: 7, maxSections: 10 }).catch(() => null),
-      estimateBpmFromAudioUrl(previewUrl),
-    ]);
-
-    return {
-      analysisResult,
-      bpm: analysisResult?.bpm ?? fallbackBpm,
-    };
+  const estimateClipBpm = useCallback(async (previewUrl: string) => {
+    return estimateBpmFromAudioUrl(previewUrl);
   }, []);
+
+  useEffect(() => {
+    if (wizardStep !== 2 || !musicClip?.assetId) {
+      return;
+    }
+    const blob = assetBlobsRef.current[musicClip.assetId];
+    if (!blob) {
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setWizardAnalysisLoading(true);
+      setWizardMelLoading(true);
+      setWizardAnalysis(null);
+      setWizardMel(null);
+      try {
+        const [a, m] = await Promise.all([
+          analyzeAudio(blob, { minSectionDuration: 7, maxSections: 12 }),
+          computeMelSpectrogramFromBlob(blob),
+        ]);
+        if (cancelled) {
+          return;
+        }
+        setWizardAnalysis(a);
+        setWizardMel(m);
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : 'Audio analysis failed');
+        }
+      } finally {
+        if (!cancelled) {
+          setWizardAnalysisLoading(false);
+          setWizardMelLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wizardStep, musicClip?.assetId, assetBlobs]);
 
   const persistNow = useCallback(async (nextProject: typeof project, nextAssetBlobs: AssetBlobMap) => {
     try {
@@ -436,6 +478,9 @@ export default function Editor() {
     const nextProject = createDefaultProject();
     setProject(nextProject);
     setAssetBlobs({});
+    setWizardStep(0);
+    setWizardAnalysis(null);
+    setWizardMel(null);
     setSelectedClipId(null);
     setCurrentTime(0);
     setIsSubtitleAlignmentOpen(false);
@@ -550,11 +595,8 @@ export default function Editor() {
     setIsGeneratingSplitMarkers(true);
 
     try {
-      const analysis = musicAnalysis?.assetId === clip.assetId
-        ? musicAnalysis.result
-        : await analyzeAudio(audioBlob, { minSectionDuration: 7, maxSections: 10 });
-
-      setMusicAnalysis({ assetId: clip.assetId, result: analysis });
+      const analysis = currentProject.audioStructure.analysis
+        ?? await analyzeAudio(audioBlob, { minSectionDuration: 7, maxSections: 12 });
 
       const planningCues = currentProject.subtitles.cues.filter(
         (cue) => cue.words.length > 0 || cue.text.trim() !== 'Your subtitles here',
@@ -566,6 +608,7 @@ export default function Editor() {
         timelineStartSec: clip.start,
         sourceStartSec: clip.trimStart ?? 0,
         visibleDurationSec: clip.duration,
+        boundaryOverrides: currentProject.audioStructure.boundaryOverrides,
       });
 
       setProject((nextProject) => storeSplitMarkers(nextProject, nextProject.splitPlanning.preset, markers));
@@ -581,7 +624,7 @@ export default function Editor() {
     } finally {
       setIsGeneratingSplitMarkers(false);
     }
-  }, [musicAnalysis]);
+  }, []);
 
   const handleCloseSubtitleAlignment = useCallback(() => {
     if (projectRef.current.lyricSync.subtitleAlignment.status === 'running') {
@@ -626,6 +669,50 @@ export default function Editor() {
     setIsSubtitleAlignmentOpen(false);
   }, []);
 
+  const handleFinishOnboarding = useCallback((payload: {
+    analysis: AudioAnalysisResult;
+    boundaryOverrides: number[] | null;
+    sectionLabels: string[] | null;
+  }) => {
+    const assetId = projectRef.current.music.clip?.assetId ?? null;
+    setProject((p) => {
+      let n = storeAudioStructure(p, {
+        analysis: payload.analysis,
+        boundaryOverrides: payload.boundaryOverrides,
+        sectionLabels: payload.sectionLabels,
+        analysisAssetId: assetId,
+      });
+      if (n.music.clip) {
+        n = {
+          ...n,
+          music: {
+            ...n.music,
+            clip: { ...n.music.clip, bpm: payload.analysis.bpm },
+          },
+        };
+      }
+      const clip = n.music.clip;
+      if (clip && payload.analysis) {
+        const markers = buildSmartSplitMarkers({
+          analysis: payload.analysis,
+          boundaryOverrides: payload.boundaryOverrides,
+          cues: n.subtitles.cues.filter(
+            (cue) => cue.words.length > 0 || cue.text.trim() !== 'Your subtitles here',
+          ),
+          preset: n.splitPlanning.preset,
+          timelineStartSec: clip.start,
+          sourceStartSec: clip.trimStart ?? 0,
+          visibleDurationSec: clip.duration,
+        });
+        n = storeSplitMarkers(n, n.splitPlanning.preset, markers);
+      }
+      return completeProjectSetup(n);
+    });
+    setWizardStep(0);
+    setWizardAnalysis(null);
+    setWizardMel(null);
+  }, []);
+
   const handleAddSubtitleCue = useCallback(() => {
     const subtitleCue: SubtitleCue = {
       id: createId(),
@@ -667,10 +754,10 @@ export default function Editor() {
     try {
       const assetId = createId();
       const clipId = createId();
-      const [duration, waveform, analysisBundle] = await Promise.all([
+      const [duration, waveform, bpmGuess] = await Promise.all([
         getAudioDuration(temporaryUrl),
         extractWaveformPeaks(temporaryUrl),
-        analyzeMusicSource(file, temporaryUrl),
+        estimateClipBpm(temporaryUrl),
       ]);
       const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
       const asset = createUploadedAssetRecord(assetId, file, {
@@ -688,12 +775,11 @@ export default function Editor() {
         sourceDuration: safeDuration,
         trimStart: 0,
         waveform,
-        bpm: analysisBundle.bpm ?? null,
+        bpm: bpmGuess ?? null,
       };
 
       stopPlayback();
       setProject((currentProject) => replaceMusicClip(currentProject, clip, asset));
-      setMusicAnalysis(analysisBundle.analysisResult ? { assetId, result: analysisBundle.analysisResult } : null);
       setAssetBlobs((currentBlobs) => {
         const nextBlobs = {
           ...currentBlobs,
@@ -711,7 +797,7 @@ export default function Editor() {
     } finally {
       URL.revokeObjectURL(temporaryUrl);
     }
-  }, [analyzeMusicSource, stopPlayback]);
+  }, [estimateClipBpm, stopPlayback]);
 
   const handleUploadBackgroundMedia = useCallback(async (file: File) => {
     const isVideo = file.type.startsWith('video/');
@@ -897,10 +983,10 @@ export default function Editor() {
       const url = URL.createObjectURL(blob);
 
       try {
-        const [duration, waveform, analysisBundle] = await Promise.all([
+        const [duration, waveform, bpmGuess] = await Promise.all([
           getAudioDuration(url),
           extractWaveformPeaks(url),
-          analyzeMusicSource(blob, url),
+          estimateClipBpm(url),
         ]);
         const safeDuration = Math.max(duration, MIN_CLIP_DURATION);
         const previousMusicAssetId = currentProject.music.clip?.assetId ?? null;
@@ -915,12 +1001,11 @@ export default function Editor() {
           sourceDuration: asset.duration ?? safeDuration,
           trimStart: 0,
           waveform,
-          bpm: analysisBundle.bpm ?? null,
+          bpm: bpmGuess ?? null,
         };
 
         stopPlayback();
         setProject((nextProject) => replaceMusicClip(nextProject, clip, asset));
-        setMusicAnalysis(analysisBundle.analysisResult ? { assetId, result: analysisBundle.analysisResult } : null);
         setAssetBlobs((currentBlobs) => {
           const next = { ...currentBlobs };
           if (previousMusicAssetId && previousMusicAssetId !== assetId) {
@@ -971,7 +1056,7 @@ export default function Editor() {
       setProject((nextProject) => upsertBackgroundSegment(nextProject, segment, asset, { replacePlaceholder: hasSinglePlaceholder }));
       setSelectedClipId(segmentId);
     }
-  }, [analyzeMusicSource, stopPlayback]);
+  }, [estimateClipBpm, stopPlayback]);
 
   const handleUpdateClip = useCallback((id: string, updates: Partial<Clip>) => {
     setProject((currentProject) => updateTimelineClipInProject(currentProject, id, updates));
@@ -1311,7 +1396,7 @@ export default function Editor() {
         return;
       }
 
-      if (isSubtitleAlignmentOpen) {
+      if (isSubtitleAlignmentOpen || showOnboarding) {
         return;
       }
 
@@ -1347,6 +1432,7 @@ export default function Editor() {
     handlePlay,
     isPlaying,
     isSubtitleAlignmentOpen,
+    showOnboarding,
     musicClip?.assetUrl,
     selectedClipId,
   ]);
@@ -1363,14 +1449,14 @@ export default function Editor() {
         splitPartRangePreset={project.splitPlanning.preset}
         onSplitPartRangePresetChange={handleSplitPresetChange}
         onGenerateSplitMarkers={handleGenerateSplitMarkers}
-        splitMarkerGenerationDisabled={!musicClip?.assetUrl || isGeneratingSplitMarkers}
+        splitMarkerGenerationDisabled={!setupComplete || !musicClip?.assetUrl || isGeneratingSplitMarkers}
         isGeneratingSplitMarkers={isGeneratingSplitMarkers}
         onSave={handleSave}
         onNewProject={handleNewProject}
         onExport={handleExport}
         onOpenSubtitleAlignment={handleOpenSubtitleAlignment}
         subtitleAlignmentStatus={project.lyricSync.subtitleAlignment.status}
-        subtitleAlignmentDisabled={!musicClip?.assetUrl || project.lyricSync.subtitleAlignment.status === 'running'}
+        subtitleAlignmentDisabled={!setupComplete || !musicClip?.assetUrl || project.lyricSync.subtitleAlignment.status === 'running'}
         exportDisabled={exportDisabled}
       />
       <div className="flex flex-1 overflow-hidden">
@@ -1460,7 +1546,27 @@ export default function Editor() {
           </ResizablePanelGroup>
         </div>
       </div>
-      {isSubtitleAlignmentOpen ? (
+      {showOnboarding ? (
+        <ProjectOnboardingModal
+          wizardStep={wizardStep}
+          setWizardStep={setWizardStep}
+          musicDuration={musicClip?.duration ?? null}
+          musicFileName={musicClip?.name ?? null}
+          alignmentState={project.lyricSync.subtitleAlignment}
+          subtitleAlignmentInput={subtitleAlignmentInput}
+          analysis={wizardAnalysis}
+          mel={wizardMel}
+          analysisLoading={wizardAnalysisLoading}
+          melLoading={wizardMelLoading}
+          boundaryInternals={onboardingBoundaryInternals}
+          sectionLabels={onboardingSectionLabels}
+          onUploadMusicFile={handleUploadMusic}
+          onRunSubtitleAlignment={handleRunSubtitleAlignment}
+          onApplyLyrics={handleApplySubtitleAlignment}
+          onFinishSetup={handleFinishOnboarding}
+        />
+      ) : null}
+      {isSubtitleAlignmentOpen && setupComplete ? (
         <SubtitleAlignmentModal
           key={subtitleAlignmentModalKey}
           musicDuration={musicClip?.duration ?? null}

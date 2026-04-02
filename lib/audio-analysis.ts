@@ -1,28 +1,17 @@
 import { SplitPartRangePreset, SubtitleCue, TimelineSplitMarker } from './types';
+import type {
+  AudioAnalysisPoint,
+  AudioAnalysisResult,
+} from './audio-analysis-types';
 
-export interface AudioAnalysisPoint {
-  time: number;
-  value: number;
-}
-
-export interface AudioAnalysisSection {
-  start: number;
-  end: number;
-  duration: number;
-}
-
-export interface AudioAnalysisResult {
-  provider: string;
-  generatedAt: string;
-  duration: number;
-  sampleRate: number;
-  bpm: number;
-  beatGrid: number[];
-  onsetStrength: AudioAnalysisPoint[];
-  energyStrength: AudioAnalysisPoint[];
-  sectionBoundaries: number[];
-  sections: AudioAnalysisSection[];
-}
+export type {
+  AudioAnalysisPoint,
+  AudioAnalysisResult,
+  AudioAnalysisSection,
+  AudioAnalysisSectionDiagnostics,
+  AudioAnalysisSoloWindow,
+  AudioAnalysisSummary,
+} from './audio-analysis-types';
 
 const DEFAULT_AUDIO_ANALYSIS_API_BASE_URL = 'http://127.0.0.1:8000';
 
@@ -150,6 +139,22 @@ const chooseTargetPartCount = (
   return Math.round(low + (high - low) * Math.min(1, density));
 };
 
+/** Effective section boundary times in source seconds: 0, …internal cuts…, duration. */
+export const getEffectiveSectionBoundaries = (
+  analysis: AudioAnalysisResult,
+  boundaryOverrides: readonly number[] | null | undefined,
+): number[] => {
+  const duration = analysis.duration;
+  const base = [...analysis.sectionBoundaries].sort((a, b) => a - b);
+  if (!boundaryOverrides?.length) {
+    return base;
+  }
+  const sorted = [...new Set(boundaryOverrides)]
+    .filter((t) => t > 0 && t < duration)
+    .sort((a, b) => a - b);
+  return [0, ...sorted, duration];
+};
+
 export const buildSmartSplitMarkers = (input: {
   analysis: AudioAnalysisResult;
   cues: readonly SubtitleCue[];
@@ -157,6 +162,8 @@ export const buildSmartSplitMarkers = (input: {
   timelineStartSec: number;
   sourceStartSec: number;
   visibleDurationSec: number;
+  /** When set, use these internal cuts instead of `analysis.sectionBoundaries` for section-change candidates. */
+  boundaryOverrides?: readonly number[] | null;
 }): TimelineSplitMarker[] => {
   const {
     analysis,
@@ -165,11 +172,15 @@ export const buildSmartSplitMarkers = (input: {
     timelineStartSec,
     sourceStartSec,
     visibleDurationSec,
+    boundaryOverrides,
   } = input;
   const sourceEndSec = sourceStartSec + visibleDurationSec;
   const beatGrid = analysis.beatGrid.filter((time) => time >= sourceStartSec && time <= sourceEndSec);
   const visibleCues = cues.filter((cue) => cue.start + cue.duration > sourceStartSec && cue.start < sourceEndSec);
-  const sectionBoundaries = analysis.sectionBoundaries.filter((time) => time > sourceStartSec && time < sourceEndSec);
+
+  const fullBoundaries = getEffectiveSectionBoundaries(analysis, boundaryOverrides ?? null);
+  const sectionBoundaries = fullBoundaries.filter((time) => time > sourceStartSec && time < sourceEndSec);
+
   const energySeries = (analysis.energyStrength?.length ? analysis.energyStrength : analysis.onsetStrength)
     .filter((point) => point.time >= sourceStartSec && point.time <= sourceEndSec);
   const energyPeaks = localPeakTimes(energySeries, 1.5, 72).map((time) => snapToNearest(time, beatGrid, 0.35));

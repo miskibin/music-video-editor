@@ -6,7 +6,7 @@ import { DEFAULT_SUBTITLE_STYLE, type EditorProject } from '@/lib/types';
 const now = new Date().toISOString();
 
 const project: EditorProject = {
-  version: 3,
+  version: 4,
   id: 'active-project',
   name: 'Render Manifest Check',
   createdAt: now,
@@ -132,6 +132,22 @@ const project: EditorProject = {
     },
   },
   mediaLibraryAssetIds: ['audio-1', 'video-1'],
+  splitPlanning: {
+    preset: '6-10',
+    markers: [],
+    generatedAt: null,
+  },
+  projectSetup: {
+    status: 'complete',
+    completedAt: now,
+  },
+  audioStructure: {
+    analysis: null,
+    boundaryOverrides: null,
+    sectionLabels: null,
+    analysisAssetId: null,
+    generatedAt: null,
+  },
   lyricSync: {
     subtitleAlignment: {
       status: 'idle',

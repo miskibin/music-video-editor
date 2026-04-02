@@ -65,9 +65,47 @@ class AudioAnalysisPointResponse(BaseModel):
 
 
 class AudioAnalysisSectionResponse(BaseModel):
+    index: int
     start: float
     end: float
     duration: float
+
+
+class AudioAnalysisSectionDiagnosticsResponse(BaseModel):
+    sectionIndex: int
+    start: float
+    end: float
+    duration: float
+    meanEnergy: float
+    energyStd: float
+    meanOnsetStrength: float
+    meanNovelty: float
+    meanSpectralCentroid: float
+    meanSpectralRolloff: float
+    meanZeroCrossingRate: float
+    meanVoiceActivity: float
+    meanHarmonicRatio: float
+    meanPercussiveRatio: float
+    instrumentalDrive: float
+    soloLikelihood: float
+
+
+class AudioAnalysisSoloWindowResponse(BaseModel):
+    sectionIndex: int
+    start: float
+    end: float
+    duration: float
+    confidence: float
+    type: Literal["instrumental", "vocal"]
+
+
+class AudioAnalysisSummaryResponse(BaseModel):
+    meanEnergy: float
+    energyDynamicRange: float
+    onsetDensityPerSecond: float
+    meanVoiceActivity: float
+    meanInstrumentalDrive: float
+    soloSectionCount: int
 
 
 class AudioAnalysisResponse(BaseModel):
@@ -76,11 +114,22 @@ class AudioAnalysisResponse(BaseModel):
     duration: float
     sampleRate: int
     bpm: float
+    tempoStability: float
     beatGrid: list[float]
     onsetStrength: list[AudioAnalysisPointResponse]
     energyStrength: list[AudioAnalysisPointResponse]
+    spectralCentroid: list[AudioAnalysisPointResponse]
+    spectralRolloff: list[AudioAnalysisPointResponse]
+    zeroCrossingRate: list[AudioAnalysisPointResponse]
+    noveltyStrength: list[AudioAnalysisPointResponse]
+    voiceActivity: list[AudioAnalysisPointResponse]
+    harmonicEnergyRatio: list[AudioAnalysisPointResponse]
+    percussiveEnergyRatio: list[AudioAnalysisPointResponse]
     sectionBoundaries: list[float]
     sections: list[AudioAnalysisSectionResponse]
+    sectionDiagnostics: list[AudioAnalysisSectionDiagnosticsResponse]
+    soloWindows: list[AudioAnalysisSoloWindowResponse]
+    summary: AudioAnalysisSummaryResponse
 
 
 app = FastAPI(title="Music Video Backend", version="0.1.0")

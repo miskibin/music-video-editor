@@ -14,7 +14,7 @@ const main = async () => {
   const audioStat = await fs.stat(audioPath);
 
   const project: EditorProject = {
-    version: 3,
+    version: 4,
     id: 'active-project',
     name: 'Smoke Render',
     createdAt: now,
@@ -88,6 +88,22 @@ const main = async () => {
       },
     },
     mediaLibraryAssetIds: ['audio-1'],
+    splitPlanning: {
+      preset: '6-10',
+      markers: [],
+      generatedAt: null,
+    },
+    projectSetup: {
+      status: 'complete',
+      completedAt: now,
+    },
+    audioStructure: {
+      analysis: null,
+      boundaryOverrides: null,
+      sectionLabels: null,
+      analysisAssetId: null,
+      generatedAt: null,
+    },
     lyricSync: {
       subtitleAlignment: {
         status: 'idle',

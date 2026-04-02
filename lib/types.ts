@@ -253,8 +253,17 @@ export interface ProjectFormat {
   height: number;
 }
 
+export type ProjectSetupStatus = 'incomplete' | 'complete';
+
+export interface ProjectSetupState {
+  status: ProjectSetupStatus;
+  completedAt?: string;
+}
+
+export type { AudioStructureState } from './audio-analysis-types';
+
 export interface EditorProject {
-  version: 3;
+  version: 4;
   id: string;
   name: string;
   createdAt: string;
@@ -267,6 +276,8 @@ export interface EditorProject {
   lyricSync: LyricSyncState;
   splitPlanning: SplitPlanningState;
   mediaLibraryAssetIds: string[];
+  projectSetup: ProjectSetupState;
+  audioStructure: AudioStructureState;
 }
 
 export interface Clip {
